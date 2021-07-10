@@ -154,14 +154,15 @@ class BiLSTM_CRF(nn.Module):
         forward_score = self._forward_alg(feats)
         gold_score = self._score_sentence(feats, tags)
         return forward_score - gold_score
-
+    
     def forward(self, sentence):  # dont confuse this with _forward_alg above.
         # Get the emission scores from the BiLSTM
         lstm_feats = self._get_lstm_features(sentence)
-
+        # print('lstm_feats:', lstm_feats)
         # Find the best path, given the features.
         score, tag_seq = self._viterbi_decode(lstm_feats)
         return score, tag_seq
+    
 if __name__ == "__main__":
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"
