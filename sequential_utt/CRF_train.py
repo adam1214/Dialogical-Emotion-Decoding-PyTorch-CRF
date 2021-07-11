@@ -290,20 +290,21 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
-            # Step5. check model performance on predefined validation set
-            predict_val = []
-            with torch.no_grad():
-                for i in range(0, len(val_data), 1):
-                    precheck_dia = prepare_dialog(val_data[i][0], utt_to_ix)
-                    predict_val += model(precheck_dia)[1]
-            uar_val, acc_val, conf_val = utils.evaluate(predict_val, label_val)
+        #check model performance on predefined validation set
+        predict_val = []
+        with torch.no_grad():
+            for i in range(0, len(val_data), 1):
+                precheck_dia = prepare_dialog(val_data[i][0], utt_to_ix)
+                predict_val += model(precheck_dia)[1]
+        uar_val, acc_val, conf_val = utils.evaluate(predict_val, label_val)
 
-            # Step6. Save the best model so far
-            if uar_val > max_uar_val:
-                best_epoch = epoch
-                checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
-                torch.save(checkpoint, './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
-                
+        #Save the best model so far
+        if uar_val > max_uar_val:
+            best_epoch = epoch
+            max_uar_val = uar_val
+            checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
+            torch.save(checkpoint, './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
+            
     print('The Best Epoch:', best_epoch)
     # Save
     #torch.save(model.state_dict(), './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
