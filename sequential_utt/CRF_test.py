@@ -239,23 +239,28 @@ if __name__ == "__main__":
 
     # Load model
     model_1 = CRF(len(utt_to_ix), emo_to_ix)
-    model_1.load_state_dict(torch.load('./model/' + args.dataset + '/Ses01.pth'))
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses01.pth')
+    model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
 
     model_2 = CRF(len(utt_to_ix), emo_to_ix)
-    model_2.load_state_dict(torch.load('./model/' + args.dataset + '/Ses02.pth'))
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses02.pth')
+    model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
 
     model_3 = CRF(len(utt_to_ix), emo_to_ix)
-    model_3.load_state_dict(torch.load('./model/' + args.dataset + '/Ses03.pth'))
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses03.pth')
+    model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
 
     model_4 = CRF(len(utt_to_ix), emo_to_ix)
-    model_4.load_state_dict(torch.load('./model/' + args.dataset + '/Ses04.pth'))
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses04.pth')
+    model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
 
     model_5 = CRF(len(utt_to_ix), emo_to_ix)
-    model_5.load_state_dict(torch.load('./model/' + args.dataset + '/Ses02.pth'))
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses05.pth')
+    model_5.load_state_dict(checkpoint['model_state_dict'])
     model_5.eval()
     
     # inference

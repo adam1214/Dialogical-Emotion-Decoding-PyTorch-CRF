@@ -6,6 +6,7 @@ import joblib
 import numpy as np
 import argparse
 from argparse import RawTextHelpFormatter
+import utils
 
 torch.manual_seed(1)
 
@@ -157,7 +158,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=5)
+    parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=1)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     args = parser.parse_args()
     
@@ -180,13 +181,18 @@ if __name__ == "__main__":
         dias = dialogs
         
     # Make up training data & testing data
-    
+    model_num_val_map = {1:'5', 2:'4', 3:'2', 4:'1', 5: '3'}
     train_data = []
+    val_data = []
     for dialog in dias:
-        if dialog[4] != str(args.model_num):
+        if dialog[4] != str(args.model_num) and dialog[4] != model_num_val_map[args.model_num]: # assign to train set
             train_data.append((dias[dialog],[]))
             for utt in train_data[-1][0]:
                 train_data[-1][1].append(emo_dict[utt])
+        elif dialog[4] == model_num_val_map[args.model_num]: # assign to val set
+            val_data.append((dias[dialog],[]))
+            for utt in val_data[-1][0]:
+                val_data[-1][1].append(emo_dict[utt])
 
     test_data_Ses01 = []
     test_data_Ses02 = []
@@ -243,12 +249,28 @@ if __name__ == "__main__":
         ix_to_utt[val] = key
 
     emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
+
+    label_val = []
+    for dia_emos_tuple in val_data:
+        label_val += dia_emos_tuple[1]
+    for i in range(0, len(label_val), 1):
+        if label_val[i] == 'ang':
+            label_val[i] = 0
+        elif label_val[i] == 'hap':
+            label_val[i] = 1
+        elif label_val[i] == 'neu':
+            label_val[i] = 2
+        elif label_val[i] == 'sad':
+            label_val[i] = 3
+        else:
+            label_val[i] = -1
     
     model = CRF(len(utt_to_ix), emo_to_ix)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-2, momentum=0.5)
 
-    # Make sure prepare_sequence from earlier in the LSTM section is loaded
-    for epoch in range(1):  # again, normally you would NOT do 300 epochs, it is toy data
+    max_uar_val = 0
+    best_epoch = -1
+    for epoch in range(10):
         print('Epoch', epoch)
         for dialog, emos in train_data:
             # Step 1. Remember that Pytorch accumulates gradients.
@@ -268,5 +290,20 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
+            # Step5. check model performance on predefined validation set
+            predict_val = []
+            with torch.no_grad():
+                for i in range(0, len(val_data), 1):
+                    precheck_dia = prepare_dialog(val_data[i][0], utt_to_ix)
+                    predict_val += model(precheck_dia)[1]
+            uar_val, acc_val, conf_val = utils.evaluate(predict_val, label_val)
+
+            # Step6. Save the best model so far
+            if uar_val > max_uar_val:
+                best_epoch = epoch
+                checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
+                torch.save(checkpoint, './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
+                
+    print('The Best Epoch:', best_epoch)
     # Save
-    torch.save(model.state_dict(), './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
+    #torch.save(model.state_dict(), './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
