@@ -42,8 +42,8 @@ class CRF(nn.Module):
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
-        #self.transitions.data[emo_to_ix[START_TAG], :] = -10000
-        #self.transitions.data[:, emo_to_ix[STOP_TAG]] = -10000
+        self.transitions.data[emo_to_ix[START_TAG], :] = -10000
+        self.transitions.data[:, emo_to_ix[STOP_TAG]] = -10000
 
     def _forward_alg(self, feats):
         # Do the forward algorithm to compute the partition function
@@ -83,8 +83,8 @@ class CRF(nn.Module):
             output_vals[i][1] = out_dict[ix_to_utt[dialog[i].item()]][1]
             output_vals[i][2] = out_dict[ix_to_utt[dialog[i].item()]][2]
             output_vals[i][3] = out_dict[ix_to_utt[dialog[i].item()]][3]
-            output_vals[i][4] = -10
-            output_vals[i][5] = -10
+            output_vals[i][4] = 3
+            output_vals[i][5] = 3
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
