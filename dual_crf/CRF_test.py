@@ -91,8 +91,14 @@ class CRF(nn.Module):
             output_vals[i][1] = out_dict[ix_to_utt[dialog[i].item()]][1]
             output_vals[i][2] = out_dict[ix_to_utt[dialog[i].item()]][2]
             output_vals[i][3] = out_dict[ix_to_utt[dialog[i].item()]][3]
-            output_vals[i][4] = 3
-            output_vals[i][5] = 3
+            if i == 0:
+                output_vals[i][4] = 3.0
+            else:
+                output_vals[i][4] = -3.0
+            if i == len(dialog)-1:
+                output_vals[i][5] = 3.0
+            else:
+                output_vals[i][5] = -3.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)

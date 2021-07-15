@@ -83,8 +83,14 @@ class CRF(nn.Module):
             output_vals[i][1] = out_dict[ix_to_utt[dialog[i].item()]][1]
             output_vals[i][2] = out_dict[ix_to_utt[dialog[i].item()]][2]
             output_vals[i][3] = out_dict[ix_to_utt[dialog[i].item()]][3]
-            output_vals[i][4] = -10
-            output_vals[i][5] = -10
+            if i == 0:
+                output_vals[i][4] = 3.0
+            else:
+                output_vals[i][4] = -3.0
+            if i == len(dialog)-1:
+                output_vals[i][5] = 3.0
+            else:
+                output_vals[i][5] = -3.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
@@ -157,7 +163,7 @@ class CRF(nn.Module):
         return score, tag_seq
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
     args = parser.parse_args()
 
     START_TAG = "<START>"
