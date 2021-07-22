@@ -1,9 +1,24 @@
 ## Result
-*    Dataset:IEMOCAP
+*    Dataset:IEMOCAP 
+        *    5 fold, 5 model
+        *    Every model with one session as validation set
 *    Pre-trained classifier:IAAN
 
 || Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
 | --------------------- | -------------------------- | -------------------------------- | --- | --- |
-| sequential_utt        |0.7105|0.6928|0.6846|0.6657|
-| spk_info              |**0.7321**|**0.7167**|0.7049|0.6883|
-| dual_crf              |0.7144|0.6999|0.6849|0.6661|
+| Pretrained Classifier |67.1|65.3|||
+| sequential_utt        |71.05|69.28|68.46|66.57|
+| spk_info              |**73.21**|**71.67**|70.49|68.83|
+| dual_crf              |71.44|69.99|68.49|66.61|
+
+*    Dataset:IEMOCAP 
+        *    Training + Validation set:Session01, Session02, Session03, Session04(20 dialogs at the end as validation set)
+        *    Testing set:Session05 
+*    Pre-trained classifier:DAG-ERC
+
+|| Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|Utt to Utt Training Data weighted F1|
+| -- | -- | -- | -- | -- | -- | -- |
+| Pretrained Classifier |66.22|67.76|67.87||||
+| sequential_utt        |66.66+-.44|67.76+-.36|67.91+-.37|66.63+-.25|67.73+-.23|67.89+-.24|
+| spk_info              |||||||
+| dual_crf              |||||||
