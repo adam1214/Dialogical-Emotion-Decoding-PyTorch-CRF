@@ -38,6 +38,12 @@ class CRF(nn.Module):
         # transitioning *to* i *from* j.
         self.transitions_inter = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         self.transitions_intra = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
+        
+        self.weight_spk_unchange_inter = nn.Parameter(torch.randn(1))
+        self.weight_spk_unchange_intra = nn.Parameter(torch.randn(1))
+        
+        self.weight_spk_change_inter = nn.Parameter(torch.randn(1))
+        self.weight_spk_change_intra = nn.Parameter(torch.randn(1))
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -67,9 +73,9 @@ class CRF(nn.Module):
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    trans_score = self.transitions_inter[next_tag].view(1, -1)
+                    trans_score = (self.weight_spk_change_inter*self.transitions_inter[next_tag] + self.weight_spk_change_intra*self.transitions_intra[next_tag]).view(1, -1)
                 else:
-                    trans_score = self.transitions_intra[next_tag].view(1, -1)
+                    trans_score = (self.weight_spk_unchange_inter*self.transitions_inter[next_tag] + self.weight_spk_unchange_intra*self.transitions_intra[next_tag]).view(1, -1)
                 # The ith entry of next_tag_var is the value for the
                 # edge (i -> next_tag) before we do log-sum-exp
                 next_tag_var = forward_var + trans_score + emit_score
@@ -78,7 +84,7 @@ class CRF(nn.Module):
                 alphas_t.append(log_sum_exp(next_tag_var).view(1))
             forward_var = torch.cat(alphas_t).view(1, -1)
             i += 1
-        terminal_var = forward_var + self.transitions_intra[self.emo_to_ix[STOP_TAG]]
+        terminal_var = forward_var + (self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG]] + self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG]])
         alpha = log_sum_exp(terminal_var)
         return alpha
 
@@ -89,13 +95,13 @@ class CRF(nn.Module):
                 output_vals[i][j] = out_dict[ix_to_utt[dialog[i].item()]][j]
 
             if i == 0:
-                output_vals[i][-2] = 100.0
+                output_vals[i][-2] = 10000.0
             else:
-                output_vals[i][-2] = -100.0
+                output_vals[i][-2] = -10000.0
             if i == len(dialog) - 1:
-                output_vals[i][-1] = 100.0
+                output_vals[i][-1] = 10000.0
             else:
-                output_vals[i][-1] = -100.0
+                output_vals[i][-1] = -10000.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
@@ -106,10 +112,10 @@ class CRF(nn.Module):
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
             if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                score = score + self.transitions_inter[emos[i + 1], emos[i]] + feat[emos[i + 1]]
+                score = score + (self.weight_spk_change_inter*self.transitions_inter[emos[i + 1], emos[i]] + self.weight_spk_change_intra*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
             else:
-                score = score + self.transitions_intra[emos[i + 1], emos[i]] + feat[emos[i + 1]]
-        score = score + self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]]
+                score = score + (self.weight_spk_unchange_inter*self.transitions_inter[emos[i + 1], emos[i]] + self.weight_spk_unchange_intra*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
+        score = score + (self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG], emos[-1]] + self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]])
         return score
 
     def _viterbi_decode(self, feats, dialog):
@@ -132,9 +138,9 @@ class CRF(nn.Module):
                 # We don't include the emission scores here because the max
                 # does not depend on them (we add them in below)
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    next_tag_var = forward_var + self.transitions_inter[next_tag]
+                    next_tag_var = forward_var + (self.weight_spk_change_inter*self.transitions_inter[next_tag] + self.weight_spk_change_intra*self.transitions_intra[next_tag])
                 else:
-                    next_tag_var = forward_var + self.transitions_intra[next_tag]
+                    next_tag_var = forward_var + (self.weight_spk_unchange_inter*self.transitions_inter[next_tag] + self.weight_spk_unchange_intra*self.transitions_intra[next_tag])
                 best_tag_id = argmax(next_tag_var)
                 bptrs_t.append(best_tag_id)
                 viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
@@ -145,7 +151,7 @@ class CRF(nn.Module):
             i += 1
             
         # Transition to STOP_TAG
-        terminal_var = forward_var + self.transitions_intra[self.emo_to_ix[STOP_TAG]]
+        terminal_var = forward_var + (self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
         best_tag_id = argmax(terminal_var)
         path_score = terminal_var[0][best_tag_id]
 
@@ -179,7 +185,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or U2U", default = 'original')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
-
+    
     torch.manual_seed(args.seed)
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"
@@ -192,6 +198,7 @@ if __name__ == "__main__":
     if args.dataset == 'original':
         emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
         dias = dialogs_edit
+
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/iemocap/U2U_6emo_all_iemocap.pkl')
         dias = dialogs
@@ -225,41 +232,61 @@ if __name__ == "__main__":
         for utt in dialog:
             if utt not in utt_to_ix:
                 utt_to_ix[utt] = len(utt_to_ix)
-                
+    
     ix_to_utt = {}
     for key in utt_to_ix:
         val = utt_to_ix[key]
         ix_to_utt[val] = key
-
+        
     emo_to_ix = {'exc':0, 'neu':1, 'fru':2, 'sad':3, 'hap':4, 'ang':5, START_TAG: 6, STOP_TAG: 7}
 
-    # Load model
-    model = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/model' + str(args.seed) + '.pth')
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
-    
-    # inference
-    predict = []
-    with torch.no_grad():
-        for i in range(0, len(test_data), 1):
-            precheck_dia = prepare_dialog(test_data[i][0], utt_to_ix)
-            predict += model(precheck_dia, test_data[i][0])[1]
+    label_val = []
+    for dia_emos_tuple in val_data:
+        label_val += dia_emos_tuple[1]
 
-    ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
-    label = []
-    for dia_key in dias:
-        if dia_key[4] == '5':
-            for utt in dias[dia_key]:
-                label_emo = ori_emo_dict[utt]
-                if label_emo == '---':
-                    label_emo = -1
-                else:
-                    label_emo = emo_to_ix[label_emo]
-                label.append(label_emo)
+    for i in range(0, len(label_val), 1):
+        label_val[i] = emo_to_ix[label_val[i]]
+        if label_val[i] >= 6:
+            label_val[i] = -1
+
+    model = CRF(len(utt_to_ix), emo_to_ix)
+    optimizer = optim.SGD(model.parameters(), lr=0.0008, weight_decay=1e-2, momentum=0.5)
+
+    max_f1_val = 0
+    best_epoch = -1
+    for epoch in range(10):
+        print('Epoch', epoch)
+        for dialog, emos in train_data:
+            # Step 1. Remember that Pytorch accumulates gradients.
+            # We need to clear them out before each instance
+            model.zero_grad()
     
-    uar, acc, f1, conf = utils.evaluate(predict, label, final_test=1)
-    print('UAR:', uar)
-    print('ACC:', acc)
-    print('Weighted F1', f1)
-    print(conf)
+            # Step 2. Get our inputs ready for the network, that is,
+            # turn them into Tensors of word indices.
+            dialog_tensor = prepare_dialog(dialog, utt_to_ix)
+            targets = torch.tensor([emo_to_ix[t] for t in emos], dtype=torch.long)
+    
+            # Step 3. Run our forward pass.
+            loss = model.neg_log_likelihood(dialog_tensor, targets, dialog)
+    
+            # Step 4. Compute the loss, gradients, and update the parameters by
+            # calling optimizer.step()
+            loss.backward()
+            optimizer.step()
+
+            #check model performance on predefined validation set
+            predict_val = []
+            with torch.no_grad():
+                for i in range(0, len(val_data), 1):
+                    precheck_dia = prepare_dialog(val_data[i][0], utt_to_ix)
+                    predict_val += model(precheck_dia, val_data[i][0])[1]
+            uar_val, acc_val, f1_val, conf_val = utils.evaluate(predict_val, label_val)
+    
+            #Save the best model so far
+            if f1_val > max_f1_val:
+                best_epoch = epoch
+                max_f1_val = f1_val
+                checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
+                torch.save(checkpoint, './model/' + args.dataset + '/model' + str(args.seed) + '.pth')
+            
+    print('The Best Epoch:', best_epoch)

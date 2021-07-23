@@ -8,6 +8,8 @@ import argparse
 from argparse import RawTextHelpFormatter
 import utils
 
+torch.manual_seed(1)
+
 def argmax(vec):
     # return the argmax as a python int
     _, idx = torch.max(vec, 1)
@@ -38,6 +40,12 @@ class CRF(nn.Module):
         # transitioning *to* i *from* j.
         self.transitions_inter = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         self.transitions_intra = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
+        
+        self.weight_spk_unchange_inter = nn.Parameter(torch.randn(1))
+        self.weight_spk_unchange_intra = nn.Parameter(torch.randn(1))
+        
+        self.weight_spk_change_inter = nn.Parameter(torch.randn(1))
+        self.weight_spk_change_intra = nn.Parameter(torch.randn(1))
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -67,9 +75,9 @@ class CRF(nn.Module):
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    trans_score = self.transitions_inter[next_tag].view(1, -1)
+                    trans_score = (self.weight_spk_change_inter*self.transitions_inter[next_tag] + self.weight_spk_change_intra*self.transitions_intra[next_tag]).view(1, -1)
                 else:
-                    trans_score = self.transitions_intra[next_tag].view(1, -1)
+                    trans_score = (self.weight_spk_unchange_inter*self.transitions_inter[next_tag] + self.weight_spk_unchange_intra*self.transitions_intra[next_tag]).view(1, -1)
                 # The ith entry of next_tag_var is the value for the
                 # edge (i -> next_tag) before we do log-sum-exp
                 next_tag_var = forward_var + trans_score + emit_score
@@ -78,7 +86,7 @@ class CRF(nn.Module):
                 alphas_t.append(log_sum_exp(next_tag_var).view(1))
             forward_var = torch.cat(alphas_t).view(1, -1)
             i += 1
-        terminal_var = forward_var + self.transitions_intra[self.emo_to_ix[STOP_TAG]]
+        terminal_var = forward_var + (self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG]] + self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG]])
         alpha = log_sum_exp(terminal_var)
         return alpha
 
@@ -89,13 +97,13 @@ class CRF(nn.Module):
                 output_vals[i][j] = out_dict[ix_to_utt[dialog[i].item()]][j]
 
             if i == 0:
-                output_vals[i][-2] = 100.0
+                output_vals[i][-2] = 10000.0
             else:
-                output_vals[i][-2] = -100.0
+                output_vals[i][-2] = -10000.0
             if i == len(dialog) - 1:
-                output_vals[i][-1] = 100.0
+                output_vals[i][-1] = 10000.0
             else:
-                output_vals[i][-1] = -100.0
+                output_vals[i][-1] = -10000.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
@@ -106,10 +114,10 @@ class CRF(nn.Module):
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
             if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                score = score + self.transitions_inter[emos[i + 1], emos[i]] + feat[emos[i + 1]]
+                score = score + (self.weight_spk_change_inter*self.transitions_inter[emos[i + 1], emos[i]] + self.weight_spk_change_intra*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
             else:
-                score = score + self.transitions_intra[emos[i + 1], emos[i]] + feat[emos[i + 1]]
-        score = score + self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]]
+                score = score + (self.weight_spk_unchange_inter*self.transitions_inter[emos[i + 1], emos[i]] + self.weight_spk_unchange_intra*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
+        score = score + (self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG], emos[-1]] + self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]])
         return score
 
     def _viterbi_decode(self, feats, dialog):
@@ -132,9 +140,9 @@ class CRF(nn.Module):
                 # We don't include the emission scores here because the max
                 # does not depend on them (we add them in below)
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    next_tag_var = forward_var + self.transitions_inter[next_tag]
+                    next_tag_var = forward_var + (self.weight_spk_change_inter*self.transitions_inter[next_tag] + self.weight_spk_change_intra*self.transitions_intra[next_tag])
                 else:
-                    next_tag_var = forward_var + self.transitions_intra[next_tag]
+                    next_tag_var = forward_var + (self.weight_spk_unchange_inter*self.transitions_inter[next_tag] + self.weight_spk_unchange_intra*self.transitions_intra[next_tag])
                 best_tag_id = argmax(next_tag_var)
                 bptrs_t.append(best_tag_id)
                 viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
@@ -145,7 +153,7 @@ class CRF(nn.Module):
             i += 1
             
         # Transition to STOP_TAG
-        terminal_var = forward_var + self.transitions_intra[self.emo_to_ix[STOP_TAG]]
+        terminal_var = forward_var + (self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
         best_tag_id = argmax(terminal_var)
         path_score = terminal_var[0][best_tag_id]
 
@@ -176,52 +184,75 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or U2U", default = 'original')
-    parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
     args = parser.parse_args()
 
-    torch.manual_seed(args.seed)
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/iemocap/outputs.pkl')
-    dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
-    dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
+    out_dict = joblib.load('../data/outputs.pkl')
+    dialogs = joblib.load('../data/dialog_iemocap.pkl')
+    dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     
     if args.dataset == 'original':
-        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
+    elif args.dataset == 'C2C':
+        emo_dict = joblib.load('../data/C2C_4emo_all_iemocap.pkl')
+        dias = dialogs
     elif args.dataset == 'U2U':
-        emo_dict = joblib.load('../data/iemocap/U2U_6emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
         
     # Make up training data & testing data
-    train_data = []
-    val_data = []
-    test_data = []
+    
+    test_data_Ses01 = []
+    test_data_Ses02 = []
+    test_data_Ses03 = []
+    test_data_Ses04 = []
+    test_data_Ses05 = []
+
     for dialog in dias:
-        if dialog[4] == '5':
-            test_data.append((dias[dialog],[]))
-            for utt in test_data[-1][0]:
-                test_data[-1][1].append(emo_dict[utt])
-        else:
-            train_data.append((dias[dialog],[]))
-            for utt in train_data[-1][0]:
-                train_data[-1][1].append(emo_dict[utt])
-    val_data = train_data[100:]
-    del train_data[100:]
+        if dialog[4] == '1':
+            test_data_Ses01.append((dias[dialog],[]))
+            for utt in test_data_Ses01[-1][0]:
+                test_data_Ses01[-1][1].append(emo_dict[utt])
+        elif dialog[4] == '2':
+            test_data_Ses02.append((dias[dialog],[]))
+            for utt in test_data_Ses02[-1][0]:
+                test_data_Ses02[-1][1].append(emo_dict[utt])
+        elif dialog[4] == '3':
+            test_data_Ses03.append((dias[dialog],[]))
+            for utt in test_data_Ses03[-1][0]:
+                test_data_Ses03[-1][1].append(emo_dict[utt])
+        elif dialog[4] == '4':
+            test_data_Ses04.append((dias[dialog],[]))
+            for utt in test_data_Ses04[-1][0]:
+                test_data_Ses04[-1][1].append(emo_dict[utt])
+        elif dialog[4] == '5':
+            test_data_Ses05.append((dias[dialog],[]))
+            for utt in test_data_Ses05[-1][0]:
+                test_data_Ses05[-1][1].append(emo_dict[utt])
 
     utt_to_ix = {}
-    for dialog, emos in test_data:
+    for dialog, emos in test_data_Ses01:
         for utt in dialog:
             if utt not in utt_to_ix:
                 utt_to_ix[utt] = len(utt_to_ix)
-    for dialog, emos in train_data:
+    for dialog, emos in test_data_Ses02:
         for utt in dialog:
             if utt not in utt_to_ix:
                 utt_to_ix[utt] = len(utt_to_ix)
-    for dialog, emos in val_data:
+    for dialog, emos in test_data_Ses03:
+        for utt in dialog:
+            if utt not in utt_to_ix:
+                utt_to_ix[utt] = len(utt_to_ix)
+    for dialog, emos in test_data_Ses04:
+        for utt in dialog:
+            if utt not in utt_to_ix:
+                utt_to_ix[utt] = len(utt_to_ix)
+    for dialog, emos in test_data_Ses05:
         for utt in dialog:
             if utt not in utt_to_ix:
                 utt_to_ix[utt] = len(utt_to_ix)
@@ -231,35 +262,63 @@ if __name__ == "__main__":
         val = utt_to_ix[key]
         ix_to_utt[val] = key
 
-    emo_to_ix = {'exc':0, 'neu':1, 'fru':2, 'sad':3, 'hap':4, 'ang':5, START_TAG: 6, STOP_TAG: 7}
+    emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
 
     # Load model
-    model = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/model' + str(args.seed) + '.pth')
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
+    model_1 = CRF(len(utt_to_ix), emo_to_ix)
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses01.pth')
+    model_1.load_state_dict(checkpoint['model_state_dict'])
+    model_1.eval()
+
+    model_2 = CRF(len(utt_to_ix), emo_to_ix)
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses02.pth')
+    model_2.load_state_dict(checkpoint['model_state_dict'])
+    model_2.eval()
+
+    model_3 = CRF(len(utt_to_ix), emo_to_ix)
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses03.pth')
+    model_3.load_state_dict(checkpoint['model_state_dict'])
+    model_3.eval()
+
+    model_4 = CRF(len(utt_to_ix), emo_to_ix)
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses04.pth')
+    model_4.load_state_dict(checkpoint['model_state_dict'])
+    model_4.eval()
+
+    model_5 = CRF(len(utt_to_ix), emo_to_ix)
+    checkpoint = torch.load('./model/' + args.dataset + '/Ses05.pth')
+    model_5.load_state_dict(checkpoint['model_state_dict'])
+    model_5.eval()
     
     # inference
     predict = []
     with torch.no_grad():
-        for i in range(0, len(test_data), 1):
-            precheck_dia = prepare_dialog(test_data[i][0], utt_to_ix)
-            predict += model(precheck_dia, test_data[i][0])[1]
+        for i in range(0, len(test_data_Ses01), 1):
+            precheck_dia = prepare_dialog(test_data_Ses01[i][0], utt_to_ix)
+            predict += model_1(precheck_dia, test_data_Ses01[i][0])[1]
+        
+        for i in range(0, len(test_data_Ses02), 1):
+            precheck_dia = prepare_dialog(test_data_Ses02[i][0], utt_to_ix)
+            predict += model_2(precheck_dia, test_data_Ses02[i][0])[1]
+            
+        for i in range(0, len(test_data_Ses03), 1):
+            precheck_dia = prepare_dialog(test_data_Ses03[i][0], utt_to_ix)
+            predict += model_3(precheck_dia, test_data_Ses03[i][0])[1]
+            
+        for i in range(0, len(test_data_Ses04), 1):
+            precheck_dia = prepare_dialog(test_data_Ses04[i][0], utt_to_ix)
+            predict += model_4(precheck_dia, test_data_Ses04[i][0])[1]
+        
+        for i in range(0, len(test_data_Ses05), 1):
+            precheck_dia = prepare_dialog(test_data_Ses05[i][0], utt_to_ix)
+            predict += model_5(precheck_dia, test_data_Ses05[i][0])[1]
 
-    ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
+    ori_emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
     label = []
-    for dia_key in dias:
-        if dia_key[4] == '5':
-            for utt in dias[dia_key]:
-                label_emo = ori_emo_dict[utt]
-                if label_emo == '---':
-                    label_emo = -1
-                else:
-                    label_emo = emo_to_ix[label_emo]
-                label.append(label_emo)
+    for _, dia in enumerate(dialogs):
+        label += [utils.convert_to_index(ori_emo_dict[utt]) for utt in dialogs[dia]]
     
-    uar, acc, f1, conf = utils.evaluate(predict, label, final_test=1)
+    uar, acc, conf = utils.evaluate(predict, label, final_test=1)
     print('UAR:', uar)
     print('ACC:', acc)
-    print('Weighted F1', f1)
     print(conf)

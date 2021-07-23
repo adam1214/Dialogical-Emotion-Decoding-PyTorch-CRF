@@ -38,6 +38,12 @@ class CRF(nn.Module):
         # transitioning *to* i *from* j.
         self.transitions_inter = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         self.transitions_intra = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
+        
+        self.weight_spk_unchange_inter = nn.Parameter(torch.randn(1))
+        self.weight_spk_unchange_intra = nn.Parameter(torch.randn(1))
+        
+        self.weight_spk_change_inter = nn.Parameter(torch.randn(1))
+        self.weight_spk_change_intra = nn.Parameter(torch.randn(1))
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -67,9 +73,9 @@ class CRF(nn.Module):
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    trans_score = self.transitions_inter[next_tag].view(1, -1)
+                    trans_score = (self.weight_spk_change_inter*self.transitions_inter[next_tag] + self.weight_spk_change_intra*self.transitions_intra[next_tag]).view(1, -1)
                 else:
-                    trans_score = self.transitions_intra[next_tag].view(1, -1)
+                    trans_score = (self.weight_spk_unchange_inter*self.transitions_inter[next_tag] + self.weight_spk_unchange_intra*self.transitions_intra[next_tag]).view(1, -1)
                 # The ith entry of next_tag_var is the value for the
                 # edge (i -> next_tag) before we do log-sum-exp
                 next_tag_var = forward_var + trans_score + emit_score
@@ -78,7 +84,7 @@ class CRF(nn.Module):
                 alphas_t.append(log_sum_exp(next_tag_var).view(1))
             forward_var = torch.cat(alphas_t).view(1, -1)
             i += 1
-        terminal_var = forward_var + self.transitions_intra[self.emo_to_ix[STOP_TAG]]
+        terminal_var = forward_var + (self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG]] + self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG]])
         alpha = log_sum_exp(terminal_var)
         return alpha
 
@@ -89,13 +95,13 @@ class CRF(nn.Module):
                 output_vals[i][j] = out_dict[ix_to_utt[dialog[i].item()]][j]
 
             if i == 0:
-                output_vals[i][-2] = 100.0
+                output_vals[i][-2] = 10000.0
             else:
-                output_vals[i][-2] = -100.0
+                output_vals[i][-2] = -10000.0
             if i == len(dialog) - 1:
-                output_vals[i][-1] = 100.0
+                output_vals[i][-1] = 10000.0
             else:
-                output_vals[i][-1] = -100.0
+                output_vals[i][-1] = -10000.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
@@ -106,10 +112,10 @@ class CRF(nn.Module):
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
             if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                score = score + self.transitions_inter[emos[i + 1], emos[i]] + feat[emos[i + 1]]
+                score = score + (self.weight_spk_change_inter*self.transitions_inter[emos[i + 1], emos[i]] + self.weight_spk_change_intra*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
             else:
-                score = score + self.transitions_intra[emos[i + 1], emos[i]] + feat[emos[i + 1]]
-        score = score + self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]]
+                score = score + (self.weight_spk_unchange_inter*self.transitions_inter[emos[i + 1], emos[i]] + self.weight_spk_unchange_intra*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
+        score = score + (self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG], emos[-1]] + self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]])
         return score
 
     def _viterbi_decode(self, feats, dialog):
@@ -132,9 +138,9 @@ class CRF(nn.Module):
                 # We don't include the emission scores here because the max
                 # does not depend on them (we add them in below)
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    next_tag_var = forward_var + self.transitions_inter[next_tag]
+                    next_tag_var = forward_var + (self.weight_spk_change_inter*self.transitions_inter[next_tag] + self.weight_spk_change_intra*self.transitions_intra[next_tag])
                 else:
-                    next_tag_var = forward_var + self.transitions_intra[next_tag]
+                    next_tag_var = forward_var + (self.weight_spk_unchange_inter*self.transitions_inter[next_tag] + self.weight_spk_unchange_intra*self.transitions_intra[next_tag])
                 best_tag_id = argmax(next_tag_var)
                 bptrs_t.append(best_tag_id)
                 viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
@@ -145,7 +151,7 @@ class CRF(nn.Module):
             i += 1
             
         # Transition to STOP_TAG
-        terminal_var = forward_var + self.transitions_intra[self.emo_to_ix[STOP_TAG]]
+        terminal_var = forward_var + (self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
         best_tag_id = argmax(terminal_var)
         path_score = terminal_var[0][best_tag_id]
 
