@@ -8,8 +8,6 @@ import argparse
 from argparse import RawTextHelpFormatter
 import utils
 
-torch.manual_seed(1)
-
 def argmax(vec):
     # return the argmax as a python int
     _, idx = torch.max(vec, 1)
@@ -77,20 +75,19 @@ class CRF(nn.Module):
         return alpha
 
     def _get_pretrain_model_features(self, dialog):
-        output_vals = np.zeros((len(dialog), 4+2))
+        output_vals = np.zeros((len(dialog), self.tagset_size))
         for i in range(0, len(dialog), 1):
-            output_vals[i][0] = out_dict[ix_to_utt[dialog[i].item()]][0]
-            output_vals[i][1] = out_dict[ix_to_utt[dialog[i].item()]][1]
-            output_vals[i][2] = out_dict[ix_to_utt[dialog[i].item()]][2]
-            output_vals[i][3] = out_dict[ix_to_utt[dialog[i].item()]][3]
+            for j in range(0, self.tagset_size-2, 1):
+                output_vals[i][j] = out_dict[ix_to_utt[dialog[i].item()]][j]
+
             if i == 0:
-                output_vals[i][4] = 3.0
+                output_vals[i][-2] = 100.0
             else:
-                output_vals[i][4] = -3.0
-            if i == len(dialog)-1:
-                output_vals[i][5] = 3.0
+                output_vals[i][-2] = -100.0
+            if i == len(dialog) - 1:
+                output_vals[i][-1] = 100.0
             else:
-                output_vals[i][5] = -3.0
+                output_vals[i][-1] = -100.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
@@ -164,34 +161,46 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=1)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or U2U", default = 'original')
+    parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
     
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/outputs.pkl')
-    dialogs = joblib.load('../data/dialog_iemocap.pkl')
-    dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
+    out_dict = joblib.load('../data/iemocap/outputs.pkl')
+    dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
+    dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
     
     if args.dataset == 'original':
-        emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
         dias = dialogs_edit
-    elif args.dataset == 'C2C':
-        emo_dict = joblib.load('../data/C2C_4emo_all_iemocap.pkl')
-        dias = dialogs
+
     elif args.dataset == 'U2U':
-        emo_dict = joblib.load('../data/U2U_4emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/iemocap/U2U_6emo_all_iemocap.pkl')
         dias = dialogs
         
     # Make up training data & testing data
-    model_num_val_map = {1:'5', 2:'4', 3:'2', 4:'1', 5: '3'}
     train_data = []
     val_data = []
+    test_data = []
     for dialog in dias:
-        if dialog[4] != str(args.model_num) and dialog[4] != model_num_val_map[args.model_num]: # assign to train set
+        if dialog[4] == '5':
+            test_data.append(([],[]))
+            test_data.append(([],[]))
+            for utt in dias[dialog]:
+                if utt[-4] == 'M':
+                    test_data[-2][0].append(utt)
+                    test_data[-2][1].append(emo_dict[utt])
+                elif utt[-4] == 'F':
+                    test_data[-1][0].append(utt)
+                    test_data[-1][1].append(emo_dict[utt])
+            if len(test_data[-2][0]) == 0:
+                del test_data[-2]
+            if len(test_data[-1][0]) == 0:
+                del test_data[-1]
+        else:
             train_data.append(([],[]))
             train_data.append(([],[]))
             for utt in dias[dialog]:
@@ -205,146 +214,44 @@ if __name__ == "__main__":
                 del train_data[-2]
             if len(train_data[-1][0]) == 0:
                 del train_data[-1]
-        elif dialog[4] == model_num_val_map[args.model_num]: # assign to val set
-            val_data.append(([],[]))
-            val_data.append(([],[]))
-            for utt in dias[dialog]:
-                if utt[-4] == 'M':
-                    val_data[-2][0].append(utt)
-                    val_data[-2][1].append(emo_dict[utt])
-                elif utt[-4] == 'F':
-                    val_data[-1][0].append(utt)
-                    val_data[-1][1].append(emo_dict[utt])
-            if len(val_data[-2][0]) == 0:
-                del val_data[-2]
-            if len(val_data[-1][0]) == 0:
-                del val_data[-1]
-
-    test_data_Ses01 = []
-    test_data_Ses02 = []
-    test_data_Ses03 = []
-    test_data_Ses04 = []
-    test_data_Ses05 = []
-    for dialog in dias:
-        if dialog[4] == '1':
-            test_data_Ses01.append(([],[]))
-            test_data_Ses01.append(([],[]))
-            for utt in dias[dialog]:
-                if utt[-4] == 'M':
-                    test_data_Ses01[-2][0].append(utt)
-                    test_data_Ses01[-2][1].append(emo_dict[utt])
-                elif utt[-4] == 'F':
-                    test_data_Ses01[-1][0].append(utt)
-                    test_data_Ses01[-1][1].append(emo_dict[utt])
-            if len(test_data_Ses01[-2][0]) == 0:
-                del test_data_Ses01[-2]
-            if len(test_data_Ses01[-1][0]) == 0:
-                del test_data_Ses01[-1]
-        elif dialog[4] == '2':
-            test_data_Ses02.append(([],[]))
-            test_data_Ses02.append(([],[]))
-            for utt in dias[dialog]:
-                if utt[-4] == 'M':
-                    test_data_Ses02[-2][0].append(utt)
-                    test_data_Ses02[-2][1].append(emo_dict[utt])
-                elif utt[-4] == 'F':
-                    test_data_Ses02[-1][0].append(utt)
-                    test_data_Ses02[-1][1].append(emo_dict[utt])
-            if len(test_data_Ses02[-2][0]) == 0:
-                del test_data_Ses02[-2]
-            if len(test_data_Ses02[-1][0]) == 0:
-                del test_data_Ses02[-1]
-        elif dialog[4] == '3':
-            test_data_Ses03.append(([],[]))
-            test_data_Ses03.append(([],[]))
-            for utt in dias[dialog]:
-                if utt[-4] == 'M':
-                    test_data_Ses03[-2][0].append(utt)
-                    test_data_Ses03[-2][1].append(emo_dict[utt])
-                elif utt[-4] == 'F':
-                    test_data_Ses03[-1][0].append(utt)
-                    test_data_Ses03[-1][1].append(emo_dict[utt])
-            if len(test_data_Ses03[-2][0]) == 0:
-                del test_data_Ses03[-2]
-            if len(test_data_Ses03[-1][0]) == 0:
-                del test_data_Ses03[-1]
-        elif dialog[4] == '4':
-            test_data_Ses04.append(([],[]))
-            test_data_Ses04.append(([],[]))
-            for utt in dias[dialog]:
-                if utt[-4] == 'M':
-                    test_data_Ses04[-2][0].append(utt)
-                    test_data_Ses04[-2][1].append(emo_dict[utt])
-                elif utt[-4] == 'F':
-                    test_data_Ses04[-1][0].append(utt)
-                    test_data_Ses04[-1][1].append(emo_dict[utt])
-            if len(test_data_Ses04[-2][0]) == 0:
-                del test_data_Ses04[-2]
-            if len(test_data_Ses04[-1][0]) == 0:
-                del test_data_Ses04[-1]
-        elif dialog[4] == '5':
-            test_data_Ses05.append(([],[]))
-            test_data_Ses05.append(([],[]))
-            for utt in dias[dialog]:
-                if utt[-4] == 'M':
-                    test_data_Ses05[-2][0].append(utt)
-                    test_data_Ses05[-2][1].append(emo_dict[utt])
-                elif utt[-4] == 'F':
-                    test_data_Ses05[-1][0].append(utt)
-                    test_data_Ses05[-1][1].append(emo_dict[utt])
-            if len(test_data_Ses05[-2][0]) == 0:
-                del test_data_Ses05[-2]
-            if len(test_data_Ses05[-1][0]) == 0:
-                del test_data_Ses05[-1]
+    val_data = train_data[200:]
+    del train_data[200:]
 
     utt_to_ix = {}
-    for dialog, emos in test_data_Ses01:
+    for dialog, emos in train_data:
         for utt in dialog:
             if utt not in utt_to_ix:
                 utt_to_ix[utt] = len(utt_to_ix)
-    for dialog, emos in test_data_Ses02:
+    for dialog, emos in test_data:
         for utt in dialog:
             if utt not in utt_to_ix:
                 utt_to_ix[utt] = len(utt_to_ix)
-    for dialog, emos in test_data_Ses03:
+    for dialog, emos in val_data:
         for utt in dialog:
             if utt not in utt_to_ix:
                 utt_to_ix[utt] = len(utt_to_ix)
-    for dialog, emos in test_data_Ses04:
-        for utt in dialog:
-            if utt not in utt_to_ix:
-                utt_to_ix[utt] = len(utt_to_ix)
-    for dialog, emos in test_data_Ses05:
-        for utt in dialog:
-            if utt not in utt_to_ix:
-                utt_to_ix[utt] = len(utt_to_ix)
+
     
     ix_to_utt = {}
     for key in utt_to_ix:
         val = utt_to_ix[key]
         ix_to_utt[val] = key
 
-    emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
+    emo_to_ix = {'exc':0, 'neu':1, 'fru':2, 'sad':3, 'hap':4, 'ang':5, START_TAG: 6, STOP_TAG: 7}
 
     label_val = []
     for dia_emos_tuple in val_data:
         label_val += dia_emos_tuple[1]
+
     for i in range(0, len(label_val), 1):
-        if label_val[i] == 'ang':
-            label_val[i] = 0
-        elif label_val[i] == 'hap':
-            label_val[i] = 1
-        elif label_val[i] == 'neu':
-            label_val[i] = 2
-        elif label_val[i] == 'sad':
-            label_val[i] = 3
-        else:
+        label_val[i] = emo_to_ix[label_val[i]]
+        if label_val[i] >= 6:
             label_val[i] = -1
     
     model = CRF(len(utt_to_ix), emo_to_ix)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-2, momentum=0.5)
+    optimizer = optim.SGD(model.parameters(), lr=0.0015, weight_decay=1e-2, momentum=0.5)
 
-    max_uar_val = 0
+    max_f1_val = 0
     best_epoch = -1
     for epoch in range(10):
         print('Epoch', epoch)
@@ -365,22 +272,19 @@ if __name__ == "__main__":
             # calling optimizer.step()
             loss.backward()
             optimizer.step()
-
+            
         #check model performance on predefined validation set
         predict_val = []
         with torch.no_grad():
             for i in range(0, len(val_data), 1):
                 precheck_dia = prepare_dialog(val_data[i][0], utt_to_ix)
                 predict_val += model(precheck_dia)[1]
-        uar_val, acc_val, conf_val = utils.evaluate(predict_val, label_val)
+        uar_val, acc_val, f1_val, conf_val = utils.evaluate(predict_val, label_val)
 
         #Save the best model so far
-        if uar_val > max_uar_val:
+        if f1_val > max_f1_val:
             best_epoch = epoch
-            max_uar_val = uar_val
+            max_f1_val = f1_val
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
-            torch.save(checkpoint, './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
-            
+            torch.save(checkpoint, './model/' + args.dataset + '/model' + str(args.seed) + '.pth')    
     print('The Best Epoch:', best_epoch)
-    # Save
-    #torch.save(model.state_dict(), './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')

@@ -1,9 +1,9 @@
 import numpy as np
-from sklearn.metrics import confusion_matrix, recall_score, accuracy_score
+from sklearn.metrics import confusion_matrix, recall_score, accuracy_score, f1_score
 
 def convert_to_index(emotion):
     """convert emotion to index """
-    map_emo = {'ang':0, 'hap':1, 'neu':2, 'sad':3}
+    map_emo = {'exc':0, 'neu':1, 'fru':2, 'sad':3, 'hap':4, 'ang':5}
     if emotion in map_emo.keys():
         return map_emo[emotion]
     else:
@@ -14,13 +14,13 @@ def evaluate(predict, label, final_test=0): #uar, acc, conf = utils.evaluate(pre
     label, predict = np.array(label), np.array(predict)
     index = [label != -1]
     label = label[tuple(index)]
-    if len(predict) == 10039:
+    if final_test == 1:
         predict = predict[tuple(index)]
     
     if final_test == 1:
         print('no. of label:', len(label))
         print('no. of predict:', len(predict))
-    return recall_score(label, predict, average='macro'), accuracy_score(label, predict), confusion_matrix(label, predict)
+    return recall_score(label, predict, average='macro'), accuracy_score(label, predict), f1_score(label, predict, average='weighted'), confusion_matrix(label, predict)
 
 def split_dialog(dialogs):
   """Split utterances in a dialog into a set of speaker's utternaces in that dialog.
