@@ -16,7 +16,7 @@
 *    Dataset:IEMOCAP 
         *    Training + Validation set:Session01, Session02, Session03, Session04(20 dialogs at the end as validation set)
         *    Testing set:Session05 
-        *    10 run: Avg+-Std
+        *    10 run: avg+-sample_std
 *    Pre-trained classifier:DAG-ERC
 
 || Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|Utt to Utt Training Data weighted F1|
@@ -25,3 +25,4 @@
 | sequential_utt|66.66+-.44|67.76+-.36|67.91+-.37|66.63+-.25|67.73+-.23|67.89+-.24|
 | spk_info|66.21+-.57|67.76+-.58|67.88+-.54|66.56+-.25|68.16+-.16|68.34+-.15|
 | dual_crf|66.00+-.45|67.19+-.39|67.36+-.38|66.31+-.30|67.63+-.30|67.78+-.30|
+| weighted_dual_crf|66.05+-.45|67.53+-.40|67.69+-.40|66.01+-.22|67.47+-.18|67.64+-.18|
