@@ -41,8 +41,11 @@ class CRF(nn.Module):
         self.transitions_inter = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         self.transitions_intra = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         
-        self.weight_spk_unchange = nn.Parameter(torch.randn(1, self.tagset_size*self.tagset_size)) # 1*36
-        self.weight_spk_change = nn.Parameter(torch.randn(1, self.tagset_size*self.tagset_size)) # 1*36
+        self.weight_spk_unchange_inter = nn.Parameter(torch.randn(1))
+        self.weight_spk_unchange_intra = nn.Parameter(torch.randn(1))
+        
+        self.weight_spk_change_inter = nn.Parameter(torch.randn(1))
+        self.weight_spk_change_intra = nn.Parameter(torch.randn(1))
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -53,14 +56,6 @@ class CRF(nn.Module):
         self.transitions_intra.data[:, emo_to_ix[STOP_TAG]] = -10000
 
     def _forward_alg(self, feats, dialog):
-        flatten_transitions_inter = torch.flatten(self.transitions_inter).unsqueeze(0).T #36*1
-        flatten_transitions_intra = torch.flatten(self.transitions_intra).unsqueeze(0).T #36*1
-        concat_trans = torch.cat((flatten_transitions_inter, flatten_transitions_intra), 1) #36*2
-
-        att_softmax = nn.Softmax(dim=1)
-        attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_trans))
-        attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_trans))
-
         # Do the forward algorithm to compute the partition function
         init_alphas = torch.full((1, self.tagset_size), -10000.)
         # START_TAG has all of the score.
@@ -80,9 +75,9 @@ class CRF(nn.Module):
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    trans_score = (attention_alpha_spk_change[0][0].item()*self.transitions_inter[next_tag] + attention_alpha_spk_change[0][1].item()*self.transitions_intra[next_tag]).view(1, -1)
+                    trans_score = (self.weight_spk_change_inter*self.transitions_inter[next_tag] + self.weight_spk_change_intra*self.transitions_intra[next_tag]).view(1, -1)
                 else:
-                    trans_score = (attention_alpha_spk_unchange[0][0].item()*self.transitions_inter[next_tag] + attention_alpha_spk_unchange[0][1].item()*self.transitions_intra[next_tag]).view(1, -1)
+                    trans_score = (self.weight_spk_unchange_inter*self.transitions_inter[next_tag] + self.weight_spk_unchange_intra*self.transitions_intra[next_tag]).view(1, -1)
                 # The ith entry of next_tag_var is the value for the
                 # edge (i -> next_tag) before we do log-sum-exp
                 next_tag_var = forward_var + trans_score + emit_score
@@ -91,7 +86,7 @@ class CRF(nn.Module):
                 alphas_t.append(log_sum_exp(next_tag_var).view(1))
             forward_var = torch.cat(alphas_t).view(1, -1)
             i += 1
-        terminal_var = forward_var + (attention_alpha_spk_unchange[0][1].item()*self.transitions_intra[self.emo_to_ix[STOP_TAG]] + attention_alpha_spk_unchange[0][0].item()*self.transitions_inter[self.emo_to_ix[STOP_TAG]])
+        terminal_var = forward_var + (self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG]] + self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG]])
         alpha = log_sum_exp(terminal_var)
         return alpha
 
@@ -102,45 +97,30 @@ class CRF(nn.Module):
                 output_vals[i][j] = out_dict[ix_to_utt[dialog[i].item()]][j]
 
             if i == 0:
-                output_vals[i][-2] = 3.0
+                output_vals[i][-2] = 10000.0
             else:
-                output_vals[i][-2] = -3.0
+                output_vals[i][-2] = -10000.0
             if i == len(dialog) - 1:
-                output_vals[i][-1] = 3.0
+                output_vals[i][-1] = 10000.0
             else:
-                output_vals[i][-1] = -3.0
+                output_vals[i][-1] = -10000.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
 
     def _score_dialog(self, feats, emos, dialog):
-        flatten_transitions_inter = torch.flatten(self.transitions_inter).unsqueeze(0).T #36*1
-        flatten_transitions_intra = torch.flatten(self.transitions_intra).unsqueeze(0).T #36*1
-        concat_trans = torch.cat((flatten_transitions_inter, flatten_transitions_intra), 1) #36*2
-
-        att_softmax = nn.Softmax(dim=1)
-        attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_trans))
-        attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_trans))
-        
         # Gives the score of a provided tag sequence
         score = torch.zeros(1)
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
             if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                score = score + (attention_alpha_spk_change[0][0].item()*self.transitions_inter[emos[i + 1], emos[i]] + attention_alpha_spk_change[0][1].item()*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
+                score = score + (self.weight_spk_change_inter*self.transitions_inter[emos[i + 1], emos[i]] + self.weight_spk_change_intra*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
             else:
-                score = score + (attention_alpha_spk_unchange[0][0].item()*self.transitions_inter[emos[i + 1], emos[i]] + attention_alpha_spk_unchange[0][1].item()*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
-        score = score + (attention_alpha_spk_unchange[0][0].item()*self.transitions_inter[self.emo_to_ix[STOP_TAG], emos[-1]] + attention_alpha_spk_unchange[0][1].item()*self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]])
+                score = score + (self.weight_spk_unchange_inter*self.transitions_inter[emos[i + 1], emos[i]] + self.weight_spk_unchange_intra*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
+        score = score + (self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG], emos[-1]] + self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]])
         return score
 
     def _viterbi_decode(self, feats, dialog):
-        flatten_transitions_inter = torch.flatten(self.transitions_inter).unsqueeze(0).T #36*1
-        flatten_transitions_intra = torch.flatten(self.transitions_intra).unsqueeze(0).T #36*1
-        concat_trans = torch.cat((flatten_transitions_inter, flatten_transitions_intra), 1) #36*2
-
-        att_softmax = nn.Softmax(dim=1)
-        attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_trans))
-        attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_trans))
         backpointers = []
 
         # Initialize the viterbi variables in log space
@@ -160,9 +140,9 @@ class CRF(nn.Module):
                 # We don't include the emission scores here because the max
                 # does not depend on them (we add them in below)
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    next_tag_var = forward_var + (attention_alpha_spk_change[0][0].item()*self.transitions_inter[next_tag] + attention_alpha_spk_change[0][1].item()*self.transitions_intra[next_tag])
+                    next_tag_var = forward_var + (self.weight_spk_change_inter*self.transitions_inter[next_tag] + self.weight_spk_change_intra*self.transitions_intra[next_tag])
                 else:
-                    next_tag_var = forward_var + (attention_alpha_spk_unchange[0][0].item()*self.transitions_inter[next_tag] + attention_alpha_spk_unchange[0][1].item()*self.transitions_intra[next_tag])
+                    next_tag_var = forward_var + (self.weight_spk_unchange_inter*self.transitions_inter[next_tag] + self.weight_spk_unchange_intra*self.transitions_intra[next_tag])
                 best_tag_id = argmax(next_tag_var)
                 bptrs_t.append(best_tag_id)
                 viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
@@ -173,7 +153,7 @@ class CRF(nn.Module):
             i += 1
             
         # Transition to STOP_TAG
-        terminal_var = forward_var + (attention_alpha_spk_unchange[0][0].item()*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + attention_alpha_spk_unchange[0][1].item()*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
+        terminal_var = forward_var + (self.weight_spk_unchange_inter*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + self.weight_spk_unchange_intra*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
         best_tag_id = argmax(terminal_var)
         path_score = terminal_var[0][best_tag_id]
 
