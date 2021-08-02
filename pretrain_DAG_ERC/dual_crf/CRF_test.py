@@ -176,7 +176,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or U2U", default = 'original')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or U2U", default = 'U2U')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
 
@@ -263,3 +263,18 @@ if __name__ == "__main__":
     print('ACC:', acc)
     print('Weighted F1', f1)
     print(conf)
+    
+    path = 'uar.txt'
+    f = open(path, 'a')
+    f.write(str(uar)+'\n')
+    f.close()
+    
+    path = 'acc.txt'
+    f = open(path, 'a')
+    f.write(str(acc)+'\n')
+    f.close()
+    
+    path = 'f1.txt'
+    f = open(path, 'a')
+    f.write(str(f1)+'\n')
+    f.close()

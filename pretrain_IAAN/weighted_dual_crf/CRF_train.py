@@ -204,9 +204,6 @@ if __name__ == "__main__":
     if args.dataset == 'original':
         emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
-    elif args.dataset == 'C2C':
-        emo_dict = joblib.load('../data/C2C_4emo_all_iemocap.pkl')
-        dias = dialogs
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/U2U_4emo_all_iemocap.pkl')
         dias = dialogs

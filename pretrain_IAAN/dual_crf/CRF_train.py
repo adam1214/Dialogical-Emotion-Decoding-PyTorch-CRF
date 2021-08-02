@@ -7,8 +7,11 @@ import numpy as np
 import argparse
 from argparse import RawTextHelpFormatter
 import utils
+import matplotlib.pyplot as plt
+import random
 
 torch.manual_seed(1)
+random.seed(1)
 
 def argmax(vec):
     # return the argmax as a python int
@@ -291,7 +294,10 @@ if __name__ == "__main__":
 
     max_uar_val = 0
     best_epoch = -1
+    loss_list = []
+    val_loss_list = []
     for epoch in range(10):
+        #random.shuffle(train_data)
         print('Epoch', epoch)
         for dialog, emos in train_data:
             # Step 1. Remember that Pytorch accumulates gradients.
@@ -305,6 +311,7 @@ if __name__ == "__main__":
     
             # Step 3. Run our forward pass.
             loss = model.neg_log_likelihood(dialog_tensor, targets, dialog)
+            loss_list.append(loss.item())
             
             # Step 4. Compute the loss, gradients, and update the parameters by
             # calling optimizer.step()
@@ -314,10 +321,17 @@ if __name__ == "__main__":
         #check model performance on predefined validation set
         predict_val = []
         with torch.no_grad():
+            val_loss_sum = 0
             for i in range(0, len(val_data), 1):
                 precheck_dia = prepare_dialog(val_data[i][0], utt_to_ix)
                 predict_val += model(precheck_dia, val_data[i][0])[1]
+                
+                targets = torch.tensor([emo_to_ix[t] for t in val_data[i][1]], dtype=torch.long)
+                loss = model.neg_log_likelihood(precheck_dia, targets, val_data[i][0])
+                val_loss_sum += loss.item()
+                
         uar_val, acc_val, conf_val = utils.evaluate(predict_val, label_val)
+        val_loss_list.append(val_loss_sum/len(val_data))
 
         #Save the best model so far
         if uar_val > max_uar_val:
@@ -327,5 +341,19 @@ if __name__ == "__main__":
             torch.save(checkpoint, './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
             
     print('The Best Epoch:', best_epoch)
-    # Save
-    #torch.save(model.state_dict(), './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
+    
+    train_loss_list = []
+    sum_loss = 0
+    for i in range(0, len(loss_list), 1):
+        if i != 0 and i % (len(train_data)) == 0:
+            train_loss_list.append(sum_loss/len(train_data))
+            sum_loss = 0
+        sum_loss += loss_list[i]
+    train_loss_list.append(sum_loss/len(train_data))
+        
+    plt.plot(np.arange(len(train_loss_list)), train_loss_list, 's-', color = 'r', label="train_loss")
+    plt.plot(np.arange(len(val_loss_list)), val_loss_list, 's-', color = 'b', label="val_loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend(loc = "best")
+    plt.savefig('./Ses0' + str(args.model_num) + '.png')
