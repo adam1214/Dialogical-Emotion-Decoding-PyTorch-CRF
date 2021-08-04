@@ -1,5 +1,6 @@
 ## Result
 *    Dataset:IEMOCAP 
+        *    4 emotions (ang, hap, neu, sad)
         *    5 fold, 5 model
         *    Every model with one session as validation set
 *    Pre-trained classifier:IAAN
@@ -14,6 +15,7 @@
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 
+        *    6 emotions (ang, hap, neu, sad, exc, fru)
         *    Training + Validation set:Session01, Session02, Session03, Session04(20 dialogs at the end as validation set)
         *    Testing set:Session05 
         *    10 run: avg+-sample_std
@@ -26,3 +28,17 @@
 | spk_info|66.44+-.67|67.86+-.57|68.04+-.59|**66.73+-.53**|**68.29+-.39**|**68.47+-.40**|
 | dual_crf|65.94+-.45|67.40+-.39|67.58+-.40|66.25+-.24|67.79+-.27|67.94+-.26|
 | weighted_dual_crf|66.11+-.61|67.60+-.46|67.74+-.44|66.10+-.60|67.77+-.35|67.90+-.35|
+
+--------------------------------------------------
+*    Dataset:MELD
+        *    7 emotions (anger, disgust, fear, joy, neutral, sadness, surprise)
+        *    10 run: avg+-sample_std
+*    Pre-trained classifier:DAG-ERC
+
+|| Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |
+| -- | -- | -- | -- |
+| Pretrained Classifier|48.65|63.83|63.43|
+| sequential_utt||||
+| spk_info||||
+| dual_crf||||
+| weighted_dual_crf||||
