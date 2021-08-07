@@ -38,7 +38,7 @@
 || Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |
 | -- | -- | -- | -- |
 | Pretrained Classifier|48.65|63.83|63.43|
-| sequential_utt||||
-| spk_info||||
-| dual_crf||||
-| weighted_dual_crf||||
+| sequential_utt|48.57+-.24|63.72+-.09|63.35+-.11|
+| spk_info|48.66+-.27|63.81+-.09|63.42+-.10|
+| dual_crf|48.69+-.46|63.80+-.19|63.41+-.18|
+| weighted_dual_crf|48.60+-.31|63.74+-.17|63.35+-.15|

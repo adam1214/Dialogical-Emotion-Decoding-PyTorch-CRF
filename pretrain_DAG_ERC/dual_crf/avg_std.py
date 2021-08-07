@@ -1,5 +1,5 @@
 import numpy as np
-f = open('uar.txt')
+f = open('f1.txt')
 num_list = []
 for line in f.readlines():
     #print(float(line))

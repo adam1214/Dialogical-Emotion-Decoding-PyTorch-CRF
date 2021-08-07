@@ -163,7 +163,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or U2U", default = 'original')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original\niemocap_U2U\nmeld", default = 'meld')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
     
@@ -173,33 +173,54 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/iemocap/outputs.pkl')
-    dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
-    dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
+    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
+        out_dict = joblib.load('../data/iemocap/outputs.pkl')
+        dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
+        dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
+    elif args.dataset == 'meld':
+        out_dict = joblib.load('../data/meld/outputs.pkl')
+        dialogs = joblib.load('../data/meld/dialog_meld.pkl')
     
-    if args.dataset == 'original':
+    if args.dataset == 'iemocap_original':
         emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
         dias = dialogs_edit
-
-    elif args.dataset == 'U2U':
+    elif args.dataset == 'iemocap_U2U':
         emo_dict = joblib.load('../data/iemocap/U2U_6emo_all_iemocap.pkl')
+        dias = dialogs
+    elif args.dataset == 'meld':
+        emo_dict = joblib.load('../data/meld/emo_all_meld.pkl')
         dias = dialogs
         
     # Make up training data & testing data
     train_data = []
     val_data = []
     test_data = []
-    for dialog in dias:
-        if dialog[4] == '5':
-            test_data.append((dias[dialog],[]))
-            for utt in test_data[-1][0]:
-                test_data[-1][1].append(emo_dict[utt])
-        else:
-            train_data.append((dias[dialog],[]))
-            for utt in train_data[-1][0]:
-                train_data[-1][1].append(emo_dict[utt])
-    val_data = train_data[100:]
-    del train_data[100:]
+    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
+        for dialog in dias:
+            if dialog[4] == '5':
+                test_data.append((dias[dialog],[]))
+                for utt in test_data[-1][0]:
+                    test_data[-1][1].append(emo_dict[utt])
+            else:
+                train_data.append((dias[dialog],[]))
+                for utt in train_data[-1][0]:
+                    train_data[-1][1].append(emo_dict[utt])
+        val_data = train_data[100:]
+        del train_data[100:]
+    elif args.dataset == 'meld':
+        for dialog in dias:
+            if dialog.split('_')[0] == 'train':
+                train_data.append((dias[dialog],[]))
+                for utt in train_data[-1][0]:
+                    train_data[-1][1].append(emo_dict[utt])
+            elif dialog.split('_')[0] == 'val':
+                val_data.append((dias[dialog],[]))
+                for utt in val_data[-1][0]:
+                    val_data[-1][1].append(emo_dict[utt])
+            elif dialog.split('_')[0] == 'test':
+                test_data.append((dias[dialog],[]))
+                for utt in test_data[-1][0]:
+                    test_data[-1][1].append(emo_dict[utt])
 
     utt_to_ix = {}
     for dialog, emos in test_data:
@@ -220,7 +241,10 @@ if __name__ == "__main__":
         val = utt_to_ix[key]
         ix_to_utt[val] = key
         
-    emo_to_ix = {'exc':0, 'neu':1, 'fru':2, 'sad':3, 'hap':4, 'ang':5, START_TAG: 6, STOP_TAG: 7}
+    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
+        emo_to_ix = {'exc':0, 'neu':1, 'fru':2, 'sad':3, 'hap':4, 'ang':5, START_TAG: 6, STOP_TAG: 7}
+    elif args.dataset == 'meld':
+        emo_to_ix = {'neutral':0, 'surprise':1, 'fear':2, 'sadness':3, 'joy':4, 'disgust':5, 'anger':6, START_TAG: 7, STOP_TAG: 8}
 
     label_val = []
     for dia_emos_tuple in val_data:
@@ -228,11 +252,16 @@ if __name__ == "__main__":
 
     for i in range(0, len(label_val), 1):
         label_val[i] = emo_to_ix[label_val[i]]
+        '''
         if label_val[i] >= 6:
             label_val[i] = -1
+        '''
 
     model = CRF(len(utt_to_ix), emo_to_ix)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-2, momentum=0.5)
+    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
+        optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-2, momentum=0.5)
+    elif args.dataset == 'meld':
+        optimizer = optim.SGD(model.parameters(), lr=0.005, weight_decay=0.03, momentum=0.5)
 
     max_f1_val = 0
     best_epoch = -1
@@ -280,7 +309,12 @@ if __name__ == "__main__":
             best_epoch = epoch
             max_f1_val = f1_val
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
-            torch.save(checkpoint, './model/' + args.dataset + '/model' + str(args.seed) + '.pth')
+            if args.dataset == 'iemocap_original':
+                torch.save(checkpoint, './model/iemocap/original/model' + str(args.seed) + '.pth')
+            elif args.dataset == 'iemocap_U2U':
+                torch.save(checkpoint, './model/iemocap/U2U/model' + str(args.seed) + '.pth')
+            elif args.dataset == 'meld':
+                torch.save(checkpoint, './model/meld/model' + str(args.seed) + '.pth')
             
     print('The Best Epoch:', best_epoch)
     
