@@ -41,8 +41,8 @@ class CRF(nn.Module):
         self.transitions_inter = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         self.transitions_intra = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         
-        self.weight_spk_unchange = nn.Parameter(torch.randn(1))
-        self.weight_spk_change = nn.Parameter(torch.randn(1))
+        self.weight_spk_unchange = nn.Parameter(torch.randn(1, self.tagset_size-2)) # 1*4
+        self.weight_spk_change = nn.Parameter(torch.randn(1, self.tagset_size-2)) # 1*4
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -53,8 +53,7 @@ class CRF(nn.Module):
         self.transitions_intra.data[:, emo_to_ix[STOP_TAG]] = -10000
 
     def _forward_alg(self, feats, dialog):
-        sigmoid_fun = nn.Sigmoid()
-
+        att_softmax = nn.Softmax(dim=1)
         # Do the forward algorithm to compute the partition function
         init_alphas = torch.full((1, self.tagset_size), -10000.)
         # START_TAG has all of the score.
@@ -66,6 +65,13 @@ class CRF(nn.Module):
         # Iterate through the dialog
         i = 0
         for feat in feats:
+            if i == 0:
+                concat_utt_representation = torch.cat((torch.from_numpy(np.zeros_like(out_dict[dialog[i-1]])).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+            else:
+                concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+            attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_utt_representation)) #1*2
+            attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
+
             alphas_t = []  # The forward tensors at this timestep
             for next_tag in range(self.tagset_size):
                 # broadcast the emission score: it is the same regardless of
@@ -74,9 +80,9 @@ class CRF(nn.Module):
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    trans_score = (sigmoid_fun(self.weight_spk_change)*self.transitions_inter[next_tag] + (1-sigmoid_fun(self.weight_spk_change))*self.transitions_intra[next_tag]).view(1, -1)
+                    trans_score = (attention_alpha_spk_change[0][0]*self.transitions_inter[next_tag] + attention_alpha_spk_change[0][1]*self.transitions_intra[next_tag]).view(1, -1)
                 else:
-                    trans_score = (sigmoid_fun(self.weight_spk_unchange)*self.transitions_inter[next_tag] + (1-sigmoid_fun(self.weight_spk_unchange))*self.transitions_intra[next_tag]).view(1, -1)
+                    trans_score = (attention_alpha_spk_unchange[0][0]*self.transitions_inter[next_tag] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[next_tag]).view(1, -1)
                 # The ith entry of next_tag_var is the value for the
                 # edge (i -> next_tag) before we do log-sum-exp
                 next_tag_var = forward_var + trans_score + emit_score
@@ -85,7 +91,10 @@ class CRF(nn.Module):
                 alphas_t.append(log_sum_exp(next_tag_var).view(1))
             forward_var = torch.cat(alphas_t).view(1, -1)
             i += 1
-        terminal_var = forward_var + (sigmoid_fun(self.weight_spk_unchange)*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + (1-sigmoid_fun(self.weight_spk_unchange))*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
+        
+        concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(np.zeros_like(out_dict[dialog[-1]])).unsqueeze(0).T), 1) #4*2
+        attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
+        terminal_var = forward_var + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
         alpha = log_sum_exp(terminal_var)
         return alpha
 
@@ -96,32 +105,42 @@ class CRF(nn.Module):
                 output_vals[i][j] = out_dict[ix_to_utt[dialog[i].item()]][j]
 
             if i == 0:
-                output_vals[i][-2] = 3.0
+                output_vals[i][-2] = 100.0
             else:
-                output_vals[i][-2] = -3.0
+                output_vals[i][-2] = -100.0
             if i == len(dialog) - 1:
-                output_vals[i][-1] = 3.0
+                output_vals[i][-1] = 100.0
             else:
-                output_vals[i][-1] = -3.0
+                output_vals[i][-1] = -100.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
 
     def _score_dialog(self, feats, emos, dialog):
-        sigmoid_fun = nn.Sigmoid()
+        att_softmax = nn.Softmax(dim=1)
         # Gives the score of a provided tag sequence
         score = torch.zeros(1)
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
-            if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                score = score + (sigmoid_fun(self.weight_spk_change)*self.transitions_inter[emos[i + 1], emos[i]] + (1-sigmoid_fun(self.weight_spk_change))*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
+            if i == 0:
+                concat_utt_representation = torch.cat((torch.from_numpy(np.zeros_like(out_dict[dialog[i-1]])).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
             else:
-                score = score + (sigmoid_fun(self.weight_spk_unchange)*self.transitions_inter[emos[i + 1], emos[i]] + (1-sigmoid_fun(self.weight_spk_unchange))*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
-        score = score + (sigmoid_fun(self.weight_spk_unchange)*self.transitions_inter[self.emo_to_ix[STOP_TAG], emos[-1]] + (1-sigmoid_fun(self.weight_spk_unchange))*self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]])
+                concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+            attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_utt_representation)) #1*2
+            attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
+
+            if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
+                score = score + (attention_alpha_spk_change[0][0]*self.transitions_inter[emos[i + 1], emos[i]] + attention_alpha_spk_change[0][1]*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
+            else:
+                score = score + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[emos[i + 1], emos[i]] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
+        
+        concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(np.zeros_like(out_dict[dialog[-1]])).unsqueeze(0).T), 1) #4*2
+        attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
+        score = score + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[self.emo_to_ix[STOP_TAG], emos[-1]] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]])
         return score
 
     def _viterbi_decode(self, feats, dialog):
-        sigmoid_fun = nn.Sigmoid()
+        att_softmax = nn.Softmax(dim=1)
         backpointers = []
 
         # Initialize the viterbi variables in log space
@@ -132,6 +151,13 @@ class CRF(nn.Module):
         forward_var = init_vvars
         i = 0
         for feat in feats:
+            if i == 0:
+                concat_utt_representation = torch.cat((torch.from_numpy(np.zeros_like(out_dict[dialog[i-1]])).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+            else:
+                concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+            attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_utt_representation)) #1*2
+            attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
+
             bptrs_t = []  # holds the backpointers for this step
             viterbivars_t = []  # holds the viterbi variables for this step
             for next_tag in range(self.tagset_size):
@@ -141,9 +167,9 @@ class CRF(nn.Module):
                 # We don't include the emission scores here because the max
                 # does not depend on them (we add them in below)
                 if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
-                    next_tag_var = forward_var + (sigmoid_fun(self.weight_spk_change)*self.transitions_inter[next_tag] + (1-sigmoid_fun(self.weight_spk_change))*self.transitions_intra[next_tag])
+                    next_tag_var = forward_var + (attention_alpha_spk_change[0][0]*self.transitions_inter[next_tag] + attention_alpha_spk_change[0][1]*self.transitions_intra[next_tag])
                 else:
-                    next_tag_var = forward_var + (sigmoid_fun(self.weight_spk_unchange)*self.transitions_inter[next_tag] + (1-sigmoid_fun(self.weight_spk_unchange))*self.transitions_intra[next_tag])
+                    next_tag_var = forward_var + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[next_tag] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[next_tag])
                 best_tag_id = argmax(next_tag_var)
                 bptrs_t.append(best_tag_id)
                 viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
@@ -154,7 +180,9 @@ class CRF(nn.Module):
             i += 1
             
         # Transition to STOP_TAG
-        terminal_var = forward_var + (sigmoid_fun(self.weight_spk_unchange)*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + (1-sigmoid_fun(self.weight_spk_unchange))*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
+        concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(np.zeros_like(out_dict[dialog[-1]])).unsqueeze(0).T), 1) #4*2
+        attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
+        terminal_var = forward_var + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
         best_tag_id = argmax(terminal_var)
         path_score = terminal_var[0][best_tag_id]
 
@@ -271,31 +299,28 @@ if __name__ == "__main__":
     checkpoint = torch.load('./model/' + args.dataset + '/Ses01.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
-    print(sigmoid_fun(model_1.weight_spk_unchange).item(), (1-sigmoid_fun(model_1.weight_spk_unchange)).item(), sigmoid_fun(model_1.weight_spk_change).item(), (1-sigmoid_fun(model_1.weight_spk_change)).item())
+    #print(model_1.weight_spk_unchange, model_1.weight_spk_change)
+    #print(model_1.transitions_inter, model_1.transitions_intra)
 
     model_2 = CRF(len(utt_to_ix), emo_to_ix)
     checkpoint = torch.load('./model/' + args.dataset + '/Ses02.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
-    print(sigmoid_fun(model_2.weight_spk_unchange).item(), (1-sigmoid_fun(model_2.weight_spk_unchange)).item(), sigmoid_fun(model_2.weight_spk_change).item(), (1-sigmoid_fun(model_2.weight_spk_change)).item())
 
     model_3 = CRF(len(utt_to_ix), emo_to_ix)
     checkpoint = torch.load('./model/' + args.dataset + '/Ses03.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
-    print(sigmoid_fun(model_3.weight_spk_unchange).item(), (1-sigmoid_fun(model_3.weight_spk_unchange)).item(), sigmoid_fun(model_3.weight_spk_change).item(), (1-sigmoid_fun(model_3.weight_spk_change)).item())
 
     model_4 = CRF(len(utt_to_ix), emo_to_ix)
     checkpoint = torch.load('./model/' + args.dataset + '/Ses04.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
-    print(sigmoid_fun(model_4.weight_spk_unchange).item(), (1-sigmoid_fun(model_4.weight_spk_unchange)).item(), sigmoid_fun(model_4.weight_spk_change).item(), (1-sigmoid_fun(model_4.weight_spk_change)).item())
 
     model_5 = CRF(len(utt_to_ix), emo_to_ix)
     checkpoint = torch.load('./model/' + args.dataset + '/Ses05.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])
     model_5.eval()
-    print(sigmoid_fun(model_5.weight_spk_unchange).item(), (1-sigmoid_fun(model_5.weight_spk_unchange)).item(), sigmoid_fun(model_5.weight_spk_change).item(), (1-sigmoid_fun(model_5.weight_spk_change)).item())
     
     # inference
     predict = []
