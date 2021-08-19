@@ -12,7 +12,24 @@
 | spk_info              |**73.21**|**71.67**|70.49|68.83|
 | dual_crf              |71.15|69.70|68.36|66.46|
 | weighted_dual_crf     |71.24|69.63|68.48|66.61|
-| attention_dual_crf (logit)    |71.28|69.52|68.75|66.91|
+| attention_dual_crf (logit)    |71.14|69.63|68.56|66.73|
+
+--------------------------------------------------
+*    Dataset:IEMOCAP 
+        *    4 emotions (ang, hap, neu, sad)
+        *    5 fold, 5 model
+        *    Every model with one session as validation set
+*    Pre-trained classifier:IAAN (reproduce experimental results to get concat_representation)
+
+|| Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
+| --------------------- | -------------------------- | -------------------------------- | --- | --- |
+| Pretrained Classifier |65.02|64.17|||
+| sequential_utt        |68.22|67.02|67.20|65.97|
+| spk_info              |69.27|**68.40**|68.52|67.69|
+| dual_crf              |68.01|67.02|66.97|65.72|
+| weighted_dual_crf     |68.67|67.58|67.73|66.44|
+| attention_dual_crf (logit)    |**69.64**|68.25|67.10|65.68|
+| attention_dual_crf (concat_representation)    |68.95|67.56|66.40|64.80|
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 

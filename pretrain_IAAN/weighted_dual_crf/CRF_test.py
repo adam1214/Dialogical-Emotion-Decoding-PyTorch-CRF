@@ -185,6 +185,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='my_execution_output')
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
     args = parser.parse_args()
 
@@ -192,7 +193,7 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/outputs.pkl')
+    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
     dialogs = joblib.load('../data/dialog_iemocap.pkl')
     dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     
@@ -200,7 +201,7 @@ if __name__ == "__main__":
         emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
     elif args.dataset == 'U2U':
-        emo_dict = joblib.load('../data/U2U_4emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
         
     # Make up training data & testing data
@@ -265,31 +266,31 @@ if __name__ == "__main__":
     sigmoid_fun = nn.Sigmoid()
     # Load model
     model_1 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses01.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
     print(sigmoid_fun(model_1.weight_spk_unchange).item(), (1-sigmoid_fun(model_1.weight_spk_unchange)).item(), sigmoid_fun(model_1.weight_spk_change).item(), (1-sigmoid_fun(model_1.weight_spk_change)).item())
 
     model_2 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses02.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
     print(sigmoid_fun(model_2.weight_spk_unchange).item(), (1-sigmoid_fun(model_2.weight_spk_unchange)).item(), sigmoid_fun(model_2.weight_spk_change).item(), (1-sigmoid_fun(model_2.weight_spk_change)).item())
 
     model_3 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses03.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
     print(sigmoid_fun(model_3.weight_spk_unchange).item(), (1-sigmoid_fun(model_3.weight_spk_unchange)).item(), sigmoid_fun(model_3.weight_spk_change).item(), (1-sigmoid_fun(model_3.weight_spk_change)).item())
 
     model_4 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses04.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
     print(sigmoid_fun(model_4.weight_spk_unchange).item(), (1-sigmoid_fun(model_4.weight_spk_unchange)).item(), sigmoid_fun(model_4.weight_spk_change).item(), (1-sigmoid_fun(model_4.weight_spk_change)).item())
 
     model_5 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses05.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])
     model_5.eval()
     print(sigmoid_fun(model_5.weight_spk_unchange).item(), (1-sigmoid_fun(model_5.weight_spk_unchange)).item(), sigmoid_fun(model_5.weight_spk_change).item(), (1-sigmoid_fun(model_5.weight_spk_change)).item())

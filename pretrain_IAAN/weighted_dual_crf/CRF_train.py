@@ -188,6 +188,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
     parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=1)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     args = parser.parse_args()
@@ -196,7 +197,7 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/outputs.pkl')
+    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
     dialogs = joblib.load('../data/dialog_iemocap.pkl')
     dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     
@@ -204,7 +205,7 @@ if __name__ == "__main__":
         emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
     elif args.dataset == 'U2U':
-        emo_dict = joblib.load('../data/U2U_4emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
         
     # Make up training data & testing data
@@ -349,7 +350,7 @@ if __name__ == "__main__":
             best_epoch = epoch
             max_uar_val = uar_val
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
-            torch.save(checkpoint, './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
+            torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
             
     print('The Best Epoch:', best_epoch)
     

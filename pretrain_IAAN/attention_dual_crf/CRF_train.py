@@ -43,9 +43,12 @@ class CRF(nn.Module):
         # transitioning *to* i *from* j.
         self.transitions_inter = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         self.transitions_intra = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
-        
-        self.weight_spk_unchange = nn.Parameter(torch.randn(1, self.tagset_size-2)) # 1*4
-        self.weight_spk_change = nn.Parameter(torch.randn(1, self.tagset_size-2)) # 1*4
+        if args.attention == 'logit':
+            self.weight_spk_unchange = nn.Parameter(torch.randn(1, self.tagset_size-2)) # 1*4
+            self.weight_spk_change = nn.Parameter(torch.randn(1, self.tagset_size-2)) # 1*4
+        elif args.attention == 'concat_representation':
+            self.weight_spk_unchange = nn.Parameter(torch.randn(1, len(utts_concat_representation['Ses01F_impro01_F000']))) # 1*1536
+            self.weight_spk_change = nn.Parameter(torch.randn(1, len(utts_concat_representation['Ses01F_impro01_F000']))) # 1*1536
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -68,10 +71,17 @@ class CRF(nn.Module):
         # Iterate through the dialog
         i = 0
         for feat in feats:
-            if i == 0:
-                concat_utt_representation = torch.cat((torch.from_numpy(np.zeros_like(out_dict[dialog[i-1]])).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+            if (i+1) < len(dialog):
+                if args.attention == 'logit':
+                    concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i+1]]).unsqueeze(0).T), 1) #4*2
+                elif args.attention == 'concat_representation':
+                    concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[i+1]]).unsqueeze(0).T), 1) #1536*2
             else:
-                concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+                if args.attention == 'logit':
+                    concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+                elif args.attention == 'concat_representation':
+                    concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T), 1) #1536*2
+            
             attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_utt_representation)) #1*2
             attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
 
@@ -95,7 +105,11 @@ class CRF(nn.Module):
             forward_var = torch.cat(alphas_t).view(1, -1)
             i += 1
         
-        concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(np.zeros_like(out_dict[dialog[-1]])).unsqueeze(0).T), 1) #4*2
+        if args.attention == 'logit':
+            concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T), 1) #4*2
+        elif args.attention == 'concat_representation':
+            concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[-1]]).unsqueeze(0).T), 1) #1536*2
+        
         attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
         terminal_var = forward_var + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
         alpha = log_sum_exp(terminal_var)
@@ -125,10 +139,17 @@ class CRF(nn.Module):
         score = torch.zeros(1)
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
-            if i == 0:
-                concat_utt_representation = torch.cat((torch.from_numpy(np.zeros_like(out_dict[dialog[i-1]])).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+            if (i+1) < len(dialog):
+                if args.attention == 'logit':
+                    concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i+1]]).unsqueeze(0).T), 1) #4*2
+                elif args.attention == 'concat_representation':
+                    concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[i+1]]).unsqueeze(0).T), 1) #1536*2
             else:
-                concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+                if args.attention == 'logit':
+                    concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+                elif args.attention == 'concat_representation':
+                    concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T), 1) #1536*2
+
             attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_utt_representation)) #1*2
             attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
 
@@ -137,7 +158,11 @@ class CRF(nn.Module):
             else:
                 score = score + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[emos[i + 1], emos[i]] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[emos[i + 1], emos[i]]) + feat[emos[i + 1]]
         
-        concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(np.zeros_like(out_dict[dialog[-1]])).unsqueeze(0).T), 1) #4*2
+        if args.attention == 'logit':
+            concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T), 1) #4*2
+        elif args.attention == 'concat_representation':
+            concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[-1]]).unsqueeze(0).T), 1) #1536*2
+            
         attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
         score = score + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[self.emo_to_ix[STOP_TAG], emos[-1]] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]])
         return score
@@ -154,10 +179,17 @@ class CRF(nn.Module):
         forward_var = init_vvars
         i = 0
         for feat in feats:
-            if i == 0:
-                concat_utt_representation = torch.cat((torch.from_numpy(np.zeros_like(out_dict[dialog[i-1]])).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+            if (i+1) < len(dialog):
+                if args.attention == 'logit':
+                    concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i+1]]).unsqueeze(0).T), 1) #4*2
+                elif args.attention == 'concat_representation':
+                    concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[i+1]]).unsqueeze(0).T), 1) #1536*2
             else:
-                concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+                if args.attention == 'logit':
+                    concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[i]]).unsqueeze(0).T), 1) #4*2
+                elif args.attention == 'concat_representation':
+                    concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[i]]).unsqueeze(0).T), 1) #1536*2
+
             attention_alpha_spk_change = att_softmax(torch.matmul(self.weight_spk_change, concat_utt_representation)) #1*2
             attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
 
@@ -183,7 +215,11 @@ class CRF(nn.Module):
             i += 1
             
         # Transition to STOP_TAG
-        concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(np.zeros_like(out_dict[dialog[-1]])).unsqueeze(0).T), 1) #4*2
+        if args.attention == 'logit':
+            concat_utt_representation = torch.cat((torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(out_dict[dialog[-1]]).unsqueeze(0).T), 1) #4*2
+        elif args.attention == 'concat_representation':
+            concat_utt_representation = torch.cat((torch.from_numpy(utts_concat_representation[dialog[-1]]).unsqueeze(0).T, torch.from_numpy(utts_concat_representation[dialog[-1]]).unsqueeze(0).T), 1) #1536*2
+            
         attention_alpha_spk_unchange = att_softmax(torch.matmul(self.weight_spk_unchange, concat_utt_representation)) #1*2
         terminal_var = forward_var + (attention_alpha_spk_unchange[0][0]*self.transitions_inter[self.emo_to_ix[STOP_TAG]] + attention_alpha_spk_unchange[0][1]*self.transitions_intra[self.emo_to_ix[STOP_TAG]])
         best_tag_id = argmax(terminal_var)
@@ -216,6 +252,8 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
+    parser.add_argument('-a', "--attention", type=str, help="which tensor you want for attention?", default='logit')
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
     parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=1)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     args = parser.parse_args()
@@ -224,7 +262,7 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/outputs.pkl')
+    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
     dialogs = joblib.load('../data/dialog_iemocap.pkl')
     dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     
@@ -232,9 +270,12 @@ if __name__ == "__main__":
         emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
     elif args.dataset == 'U2U':
-        emo_dict = joblib.load('../data/U2U_4emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
-        
+    
+    if args.pretrain_version == 'my_execution_output':
+        utts_concat_representation = joblib.load('../data/'+ args.pretrain_version + '/utts_concat_representation.pkl')
+    
     # Make up training data & testing data
     model_num_val_map = {1:'5', 2:'4', 3:'2', 4:'1', 5: '3'}
     train_data = []
@@ -327,7 +368,12 @@ if __name__ == "__main__":
     
     for key, value in params_dict.items():
         if key[:10] == 'weight_spk':
-            params += [{'params':value, 'weight_decay':0.0001, 'lr':0.01}]
+            if args.attention == 'logit' and args.pretrain_version == 'original_output':
+                params += [{'params':value, 'weight_decay':0.001, 'lr':0.1}]
+            elif args.attention == 'logit' and args.pretrain_version == 'my_execution_output':
+                params += [{'params':value, 'weight_decay':0.001, 'lr':0.01}]
+            elif args.attention == 'concat_representation':
+                params += [{'params':value, 'weight_decay':0.1, 'lr':0.01}]
         else:
             params += [{'params':value, 'weight_decay':0.01, 'lr':0.01}]
     
@@ -340,7 +386,8 @@ if __name__ == "__main__":
     loss_list = []
     val_loss_list = []
     for epoch in range(10):
-        #random.shuffle(train_data)
+        if args.pretrain_version == 'my_execution_output':
+            random.shuffle(train_data)
         print('Epoch', epoch)
         for dialog, emos in train_data:
             # Step 1. Remember that Pytorch accumulates gradients.
@@ -380,7 +427,10 @@ if __name__ == "__main__":
             best_epoch = epoch
             max_uar_val = uar_val
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
-            torch.save(checkpoint, './model/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
+            if args.pretrain_version == 'original_output':
+                torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
+            elif args.pretrain_version == 'my_execution_output':
+                torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.attention + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
             
     print('The Best Epoch:', best_epoch)
     

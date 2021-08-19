@@ -163,6 +163,7 @@ class CRF(nn.Module):
         return score, tag_seq
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
     args = parser.parse_args()
 
@@ -170,7 +171,7 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/outputs.pkl')
+    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
     dialogs = joblib.load('../data/dialog_iemocap.pkl')
     dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     
@@ -181,7 +182,7 @@ if __name__ == "__main__":
         emo_dict = joblib.load('../data/C2C_4emo_all_iemocap.pkl')
         dias = dialogs
     elif args.dataset == 'U2U':
-        emo_dict = joblib.load('../data/U2U_4emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
     
     test_data_Ses01 = []
@@ -292,27 +293,27 @@ if __name__ == "__main__":
 
     # Load model
     model_1 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses01.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
 
     model_2 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses02.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
 
     model_3 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses03.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
 
     model_4 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses04.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
 
     model_5 = CRF(len(utt_to_ix), emo_to_ix)
-    checkpoint = torch.load('./model/' + args.dataset + '/Ses05.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])
     model_5.eval()
     
