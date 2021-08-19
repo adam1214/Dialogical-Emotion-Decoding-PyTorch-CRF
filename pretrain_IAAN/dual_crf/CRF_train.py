@@ -71,7 +71,7 @@ class CRF(nn.Module):
                 emit_score = feat[next_tag].view(1, -1).expand(1, self.tagset_size)
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
-                if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
+                if (i+1) < len(dialog) and dialog[i][-4] != dialog[i+1][-4]:
                     trans_score = self.transitions_inter[next_tag].view(1, -1)
                 else:
                     trans_score = self.transitions_intra[next_tag].view(1, -1)
@@ -111,7 +111,7 @@ class CRF(nn.Module):
         score = torch.zeros(1)
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
-            if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
+            if (i+1) < len(dialog) and dialog[i][-4] != dialog[i+1][-4]:
                 score = score + self.transitions_inter[emos[i + 1], emos[i]] + feat[emos[i + 1]]
             else:
                 score = score + self.transitions_intra[emos[i + 1], emos[i]] + feat[emos[i + 1]]
@@ -137,7 +137,7 @@ class CRF(nn.Module):
                 # from tag i to next_tag.
                 # We don't include the emission scores here because the max
                 # does not depend on them (we add them in below)
-                if i > 0 and dialog[i-1][-4] != dialog[i][-4]:
+                if (i+1) < len(dialog) and dialog[i][-4] != dialog[i+1][-4]:
                     next_tag_var = forward_var + self.transitions_inter[next_tag]
                 else:
                     next_tag_var = forward_var + self.transitions_intra[next_tag]
@@ -290,7 +290,7 @@ if __name__ == "__main__":
             label_val[i] = -1
     
     model = CRF(len(utt_to_ix), emo_to_ix)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-2, momentum=0.5)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=0.01, momentum=0.8)
 
     max_uar_val = 0
     best_epoch = -1
