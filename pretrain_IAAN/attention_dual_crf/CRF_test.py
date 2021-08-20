@@ -249,9 +249,9 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-a', "--attention", type=str, help="which tensor you want for attention?", default='logit')
-    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='my_execution_output')
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
+    parser.add_argument('-a', "--attention", type=str, help="which tensor you want for attention?", default='concat_representation')
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='BiGRU_att')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
     args = parser.parse_args()
 
     START_TAG = "<START>"
@@ -269,7 +269,7 @@ if __name__ == "__main__":
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
     
-    if args.pretrain_version == 'my_execution_output':
+    if args.pretrain_version != 'original_output':
         utts_concat_representation = joblib.load('../data/'+ args.pretrain_version + '/utts_concat_representation.pkl')
         
     # Make up training data & testing data
@@ -336,7 +336,7 @@ if __name__ == "__main__":
     model_1 = CRF(len(utt_to_ix), emo_to_ix)
     if args.pretrain_version == 'original_output':
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01.pth')
-    elif args.pretrain_version == 'my_execution_output':
+    else:
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.attention + '/' + args.dataset + '/Ses01.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
@@ -346,7 +346,7 @@ if __name__ == "__main__":
     model_2 = CRF(len(utt_to_ix), emo_to_ix)
     if args.pretrain_version == 'original_output':
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02.pth')
-    elif args.pretrain_version == 'my_execution_output':
+    else:
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.attention + '/' + args.dataset + '/Ses02.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
@@ -354,7 +354,7 @@ if __name__ == "__main__":
     model_3 = CRF(len(utt_to_ix), emo_to_ix)
     if args.pretrain_version == 'original_output':
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03.pth')
-    elif args.pretrain_version == 'my_execution_output':
+    else:
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.attention + '/' + args.dataset + '/Ses03.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
@@ -362,7 +362,7 @@ if __name__ == "__main__":
     model_4 = CRF(len(utt_to_ix), emo_to_ix)
     if args.pretrain_version == 'original_output':
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04.pth')
-    elif args.pretrain_version == 'my_execution_output':
+    else:
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.attention + '/' + args.dataset + '/Ses04.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
@@ -370,7 +370,7 @@ if __name__ == "__main__":
     model_5 = CRF(len(utt_to_ix), emo_to_ix)
     if args.pretrain_version == 'original_output':
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05.pth')
-    elif args.pretrain_version == 'my_execution_output':
+    else:
         checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.attention + '/' + args.dataset + '/Ses05.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])
     model_5.eval()

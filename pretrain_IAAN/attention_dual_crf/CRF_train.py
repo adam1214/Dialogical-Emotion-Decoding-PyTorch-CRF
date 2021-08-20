@@ -273,7 +273,7 @@ if __name__ == "__main__":
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
     
-    if args.pretrain_version == 'my_execution_output':
+    if args.pretrain_version != 'original_output':
         utts_concat_representation = joblib.load('../data/'+ args.pretrain_version + '/utts_concat_representation.pkl')
     
     # Make up training data & testing data
@@ -429,7 +429,7 @@ if __name__ == "__main__":
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
             if args.pretrain_version == 'original_output':
                 torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
-            elif args.pretrain_version == 'my_execution_output':
+            else:
                 torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.attention + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
             
     print('The Best Epoch:', best_epoch)

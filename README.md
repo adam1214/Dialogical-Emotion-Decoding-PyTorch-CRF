@@ -33,6 +33,24 @@
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 
+        *    4 emotions (ang, hap, neu, sad)
+        *    5 fold, 5 model
+        *    Every model with one session as validation set
+*    Pre-trained classifier:IAAN variants (BiGRU+ATT)
+        *    A BiGRU network with the classical attention (ATT) trained using current utterances only.
+
+|| Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
+| --------------------- | -------------------------- | -------------------------------- | --- | --- |
+| Pretrained Classifier |59.80|58.45|||
+| sequential_utt        |65.82|64.62|62.91|61.45|
+| spk_info              |68.69|67.69|64.54|63.26|
+| dual_crf              |65.50|64.60|63.81|62.52|
+| weighted_dual_crf     |65.80|64.49|63.64|62.36|
+| attention_dual_crf (logit)    |64.02|62.74|63.52|62.29|
+| attention_dual_crf (concat_representation)    |64.61|63.26|62.86|61.51|
+
+--------------------------------------------------
+*    Dataset:IEMOCAP 
         *    6 emotions (ang, hap, neu, sad, exc, fru)
         *    Training + Validation set:Session01, Session02, Session03, Session04(20 dialogs at the end as validation set)
         *    Testing set:Session05 
