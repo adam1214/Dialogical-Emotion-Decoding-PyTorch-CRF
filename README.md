@@ -51,6 +51,28 @@
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 
+        *    4 emotions (ang, hap, neu, sad)
+        *    5 fold, 5 model
+        *    Every model with one session as validation set
+*    Pre-trained classifier:BERT_IAAN
+        *    word embeding by BERT base (uncased)
+                *    summation over the last 4 layers
+                *    dimension of each word: (1, 768)
+                *    dimension of each utterance: (n, 768)
+                        *    n: number of words in the utterance
+
+|| Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
+| --------------------- | -------------------------- | -------------------------------- | --- | --- |
+| Pretrained Classifier |76.01|75.21|||
+| sequential_utt        |78.36|77.80|77.22|76.50|
+| spk_info              |**81.62**|**81.07**|79.76|78.94|
+| dual_crf              |78.12|77.51|76.83|76.17|
+| weighted_dual_crf     |78.16|77.73|76.87|76.19|
+| attention_dual_crf (logit)    |78.10|77.65|77.09|76.51|
+| attention_dual_crf (concat_representation)    |77.48|77.00|76.78|76.15|
+
+--------------------------------------------------
+*    Dataset:IEMOCAP 
         *    6 emotions (ang, hap, neu, sad, exc, fru)
         *    Training + Validation set:Session01, Session02, Session03, Session04(20 dialogs at the end as validation set)
         *    Testing set:Session05 

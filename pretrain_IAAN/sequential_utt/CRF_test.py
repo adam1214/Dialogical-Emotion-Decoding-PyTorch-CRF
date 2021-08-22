@@ -163,7 +163,7 @@ class CRF(nn.Module):
         return score, tag_seq
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='BiGRU_att')
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='bert_iaan')
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
     args = parser.parse_args()
 
@@ -178,9 +178,6 @@ if __name__ == "__main__":
     if args.dataset == 'original':
         emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
-    elif args.dataset == 'C2C':
-        emo_dict = joblib.load('../data/C2C_4emo_all_iemocap.pkl')
-        dias = dialogs
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
