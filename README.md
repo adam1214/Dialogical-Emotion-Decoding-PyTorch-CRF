@@ -12,7 +12,7 @@
 | spk_info              |**73.21**|**71.67**|70.49|68.83|
 | dual_crf              |71.15|69.70|68.36|66.46|
 | weighted_dual_crf     |71.24|69.63|68.48|66.61|
-| attention_dual_crf (logit)    |71.14|69.63|68.56|66.73|
+| attention_dual_crf (logit)    |71.15|69.59|68.53|66.68|
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 
@@ -25,11 +25,11 @@
 | --------------------- | -------------------------- | -------------------------------- | --- | --- |
 | Pretrained Classifier |65.02|64.17|||
 | sequential_utt        |68.22|67.02|67.20|65.97|
-| spk_info              |69.27|**68.40**|68.52|67.69|
+| spk_info              |69.27|68.40|68.52|67.69|
 | dual_crf              |68.01|67.02|66.97|65.72|
 | weighted_dual_crf     |68.67|67.58|67.73|66.44|
-| attention_dual_crf (logit)    |**69.64**|68.25|67.10|65.68|
-| attention_dual_crf (concat_representation)    |68.95|67.56|66.40|64.80|
+| attention_dual_crf (logit)    |69.22|68.03|66.79|65.38|
+| attention_dual_crf (concat_representation)    |**70.47**|**68.88**|66.62|62.14|
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 
@@ -46,8 +46,8 @@
 | spk_info              |**68.69**|**67.69**|64.54|63.26|
 | dual_crf              |65.50|64.60|63.81|62.52|
 | weighted_dual_crf     |65.80|64.49|63.64|62.36|
-| attention_dual_crf (logit)    |64.02|62.74|63.52|62.29|
-| attention_dual_crf (concat_representation)    |64.61|63.26|62.86|61.51|
+| attention_dual_crf (logit)    |66.60|65.76|64.66|63.21|
+| attention_dual_crf (concat_representation)    |67.64|67.24|64.95|62.59|
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 
@@ -68,8 +68,8 @@
 | spk_info              |**81.62**|**81.07**|79.76|78.94|
 | dual_crf              |78.12|77.51|76.83|76.17|
 | weighted_dual_crf     |78.16|77.73|76.87|76.19|
-| attention_dual_crf (logit)    |78.10|77.65|77.09|76.51|
-| attention_dual_crf (concat_representation)    |77.48|77.00|76.78|76.15|
+| attention_dual_crf (logit)    |78.42|77.51|76.69|75.88|
+| attention_dual_crf (concat_representation)    |78.84|78.05|77.45|76.48|
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 
