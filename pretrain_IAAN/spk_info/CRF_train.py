@@ -9,8 +9,6 @@ from argparse import RawTextHelpFormatter
 import utils
 import matplotlib.pyplot as plt
 
-torch.manual_seed(1)
-
 def argmax(vec):
     # return the argmax as a python int
     _, idx = torch.max(vec, 1)
@@ -168,7 +166,10 @@ if __name__ == "__main__":
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
     parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=1)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
+    parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
+
+    torch.manual_seed(args.seed)
     
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"

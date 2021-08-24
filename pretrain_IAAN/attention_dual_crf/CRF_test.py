@@ -8,8 +8,6 @@ import argparse
 from argparse import RawTextHelpFormatter
 import utils
 
-torch.manual_seed(1)
-
 def argmax(vec):
     # return the argmax as a python int
     _, idx = torch.max(vec, 1)
@@ -249,9 +247,9 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-a', "--attention", type=str, help="which tensor you want for attention?", default='concat_representation')
-    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='bert_iaan')
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
+    parser.add_argument('-a', "--attention", type=str, help="which tensor you want for attention?", default='logit')
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='BiGRU_att')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     args = parser.parse_args()
 
     START_TAG = "<START>"
@@ -407,3 +405,14 @@ if __name__ == "__main__":
     print('UAR:', uar)
     print('ACC:', acc)
     print(conf)
+    
+    path = 'uar.txt'
+    f = open(path, 'a')
+    f.write(str(uar)+'\n')
+    f.close()
+    
+    path = 'acc.txt'
+    f = open(path, 'a')
+    f.write(str(acc)+'\n')
+    f.close()
+    
