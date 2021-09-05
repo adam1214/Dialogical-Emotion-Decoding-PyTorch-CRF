@@ -88,6 +88,36 @@
 | weighted_dual_crf|66.20+-.76|67.50+-.64|67.66+-.60|66.11+-.59|67.84+-.34|67.95+-.33|
 
 --------------------------------------------------
+*    Dataset:IEMOCAP 
+        *    4 emotions (ang, hap, neu, sad)
+        *    Training + Validation set:Session01, Session02, Session03, Session04(20 dialogs at the end as validation set)
+        *    Testing set:Session05 
+        *    10 run: avg+-sample_std
+*    Pre-trained classifier:DAG-ERC
+
+|| Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|Utt to Utt Training Data weighted F1|
+| -- | -- | -- | -- | -- | -- | -- |
+| Pretrained Classifier|83.11|82.27|82.39||||
+| sequential_utt|82.98|82.19|82.28||||
+
+--------------------------------------------------
+*    Dataset:IEMOCAP 
+        *    6 emotions (ang, hap, neu, sad, exc, fru)
+        *    5 fold, 5 model
+                * fold 5: the last 20 dialogs in session 4 are val set
+                * fold 4: the last 20 dialogs in session 5 are val set
+                * fold 3: the last 20 dialogs in session 1 are val set
+                * fold 2: the last 20 dialogs in session 3 are val set
+                * fold 1: the last 20 dialogs in session 2 are val set
+        *    10 run: avg+-sample_std
+*    Pre-trained classifier:DAG-ERC
+
+|| Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|Utt to Utt Training Data weighted F1|
+| -- | -- | -- | -- | -- | -- | -- |
+| Pretrained Classifier|77.23|77.25|77.24||||
+| sequential_utt|76.75|76.80|76.71||||
+
+--------------------------------------------------
 *    Dataset:MELD
         *    7 emotions (anger, disgust, fear, joy, neutral, sadness, surprise)
         *    10 run: avg+-sample_std

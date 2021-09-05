@@ -161,7 +161,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original\niemocap_U2U\nmeld", default = 'meld')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original_4\niemocap_original_6\niemocap_U2U_4\niemocap_U2U_6\nmeld", default = 'iemocap_original_4')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
 
@@ -170,18 +170,30 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
     
-    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-        out_dict = joblib.load('../data/iemocap/outputs.pkl')
-        dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
-        dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
+    if args.dataset == 'iemocap_original_4' or args.dataset == 'iemocap_original_6' or args.dataset == 'iemocap_U2U_4' or args.dataset == 'iemocap_U2U_6':
+        if args.dataset[-1] == '4':
+            out_dict = joblib.load('../data/iemocap/outputs_4.pkl')
+            dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
+            dialogs_edit = joblib.load('../data/iemocap/dialog_4emo_iemocap.pkl')
+        elif args.dataset[-1] == '6':
+            out_dict = joblib.load('../data/iemocap/outputs_6.pkl')
+            dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
+            dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
+
     elif args.dataset == 'meld':
         out_dict = joblib.load('../data/meld/outputs.pkl')
         dialogs = joblib.load('../data/meld/dialog_meld.pkl')
     
-    if args.dataset == 'iemocap_original':
-        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
+    if args.dataset == 'iemocap_original_4':
+        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap_4.pkl')
         dias = dialogs_edit
-    elif args.dataset == 'iemocap_U2U':
+    elif args.dataset == 'iemocap_original_6':
+        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap_6.pkl')
+        dias = dialogs_edit
+    elif args.dataset == 'iemocap_U2U_4':
+        emo_dict = joblib.load('../data/iemocap/U2U_4emo_all_iemocap.pkl')
+        dias = dialogs
+    elif args.dataset == 'iemocap_U2U_6':
         emo_dict = joblib.load('../data/iemocap/U2U_6emo_all_iemocap.pkl')
         dias = dialogs
     elif args.dataset == 'meld':
@@ -192,7 +204,7 @@ if __name__ == "__main__":
     train_data = []
     val_data = []
     test_data = []
-    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
+    if args.dataset == 'iemocap_original_4' or args.dataset == 'iemocap_original_6' or args.dataset == 'iemocap_U2U_4' or args.dataset == 'iemocap_U2U_6':
         for dialog in dias:
             if dialog[4] == '5':
                 test_data.append((dias[dialog],[]))
@@ -238,16 +250,18 @@ if __name__ == "__main__":
         val = utt_to_ix[key]
         ix_to_utt[val] = key
     
-    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
+    if args.dataset == 'iemocap_original_6' or args.dataset == 'iemocap_U2U_6':
         emo_to_ix = {'exc':0, 'neu':1, 'fru':2, 'sad':3, 'hap':4, 'ang':5, START_TAG: 6, STOP_TAG: 7}
+    elif args.dataset == 'iemocap_original_4' or args.dataset == 'iemocap_U2U_4':
+        emo_to_ix = {'hap':0, 'neu':1, 'sad':2, 'ang':3, START_TAG: 4, STOP_TAG: 5}
     elif args.dataset == 'meld':
         emo_to_ix = {'neutral':0, 'surprise':1, 'fear':2, 'sadness':3, 'joy':4, 'disgust':5, 'anger':6, START_TAG: 7, STOP_TAG: 8}
 
     # Load model
     model = CRF(len(utt_to_ix), emo_to_ix)
-    if args.dataset == 'iemocap_original':
+    if args.dataset == 'iemocap_original_4' or args.dataset == 'iemocap_original_6':
         checkpoint = torch.load('./model/iemocap/original/model' + str(args.seed) + '.pth')
-    elif args.dataset == 'iemocap_U2U':
+    elif args.dataset == 'iemocap_U2U_4' or args.dataset == 'iemocap_U2U_6':
         checkpoint = torch.load('./model/iemocap/U2U/model' + str(args.seed) + '.pth')
     elif args.dataset == 'meld':
         checkpoint = torch.load('./model/meld/model' + str(args.seed) + '.pth')
@@ -261,13 +275,15 @@ if __name__ == "__main__":
             precheck_dia = prepare_dialog(test_data[i][0], utt_to_ix)
             predict += model(precheck_dia)[1]
             
-    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-        ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
+    if args.dataset == 'iemocap_original_4' or args.dataset == 'iemocap_U2U_4':
+        ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap_4.pkl')
+    elif args.dataset == 'iemocap_original_6' or args.dataset == 'iemocap_U2U_6':
+        ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap_6.pkl')
     elif args.dataset == 'meld':
         ori_emo_dict = joblib.load('../data/meld/emo_all_meld.pkl')
         
     label = []
-    if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
+    if args.dataset == 'iemocap_original_4' or args.dataset == 'iemocap_original_6' or args.dataset == 'iemocap_U2U_4' or args.dataset == 'iemocap_U2U_6':
         for dia_key in dias:
             if dia_key[4] == '5':
                 for utt in dias[dia_key]:
@@ -290,7 +306,7 @@ if __name__ == "__main__":
     print('ACC:', acc)
     print('Weighted F1', f1)
     print(conf)
-    
+    '''
     path = 'uar.txt'
     f = open(path, 'a')
     f.write(str(uar)+'\n')
@@ -305,4 +321,4 @@ if __name__ == "__main__":
     f = open(path, 'a')
     f.write(str(f1)+'\n')
     f.close()
-    
+    '''
