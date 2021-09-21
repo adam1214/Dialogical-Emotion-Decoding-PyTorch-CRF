@@ -68,10 +68,10 @@ class CRF(nn.Module):
                 emit_score = feat[next_tag].view(1, -1).expand(1, self.tagset_size)
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
-                if (i+1) < len(dialog) and dialog[i][-4] != dialog[i+1][-4]:
-                    trans_score = self.transitions_inter[next_tag].view(1, -1)
-                else:
+                if i == 0 or dialog[i-1][-4] == dialog[i][-4]:
                     trans_score = self.transitions_intra[next_tag].view(1, -1)
+                else:
+                    trans_score = self.transitions_inter[next_tag].view(1, -1)
                 # The ith entry of next_tag_var is the value for the
                 # edge (i -> next_tag) before we do log-sum-exp
                 next_tag_var = forward_var + trans_score + emit_score
@@ -108,10 +108,10 @@ class CRF(nn.Module):
         score = torch.zeros(1)
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
-            if (i+1) < len(dialog) and dialog[i][-4] != dialog[i+1][-4]:
-                score = score + self.transitions_inter[emos[i + 1], emos[i]] + feat[emos[i + 1]]
-            else:
+            if i == 0 or dialog[i-1][-4] == dialog[i][-4]:
                 score = score + self.transitions_intra[emos[i + 1], emos[i]] + feat[emos[i + 1]]
+            else:
+                score = score + self.transitions_inter[emos[i + 1], emos[i]] + feat[emos[i + 1]]
         score = score + self.transitions_intra[self.emo_to_ix[STOP_TAG], emos[-1]]
         return score
 
@@ -134,10 +134,10 @@ class CRF(nn.Module):
                 # from tag i to next_tag.
                 # We don't include the emission scores here because the max
                 # does not depend on them (we add them in below)
-                if (i+1) < len(dialog) and dialog[i][-4] != dialog[i+1][-4]:
-                    next_tag_var = forward_var + self.transitions_inter[next_tag]
-                else:
+                if i == 0 or dialog[i-1][-4] == dialog[i][-4]:
                     next_tag_var = forward_var + self.transitions_intra[next_tag]
+                else:
+                    next_tag_var = forward_var + self.transitions_inter[next_tag]
                 best_tag_id = argmax(next_tag_var)
                 bptrs_t.append(best_tag_id)
                 viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))

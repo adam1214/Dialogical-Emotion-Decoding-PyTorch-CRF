@@ -1,20 +1,22 @@
 import joblib
 dialog = joblib.load('./dialog_iemocap.pkl')
+emo_dict = joblib.load('./emo_all_iemocap.pkl')
 
-s1_cnt=0
-s2_cnt=0
-s3_cnt=0
-s4_cnt=0
-s5_cnt=0
+emo_tran = 0
+emo_spk_tran = 0
+total = 0
 
 for dialog_name in dialog:
-    if dialog_name[4] == '1':
-        s1_cnt += 1
-    elif dialog_name[4] == '2':
-        s2_cnt += 1
-    elif dialog_name[4] == '3':
-        s3_cnt += 1
-    elif dialog_name[4] == '4':
-        s4_cnt += 1
-    elif dialog_name[4] == '5':
-        s5_cnt += 1
+    pre_emo = ''
+    pre_spk = ''
+    for utt in dialog[dialog_name]:
+        if pre_emo != '' and emo_dict[utt] != pre_emo:
+            emo_tran += 1
+        if pre_emo != '' and emo_dict[utt] != pre_emo and pre_spk != utt[-4]:
+            emo_spk_tran += 1
+        
+        if pre_emo != '':
+            total += 1
+        
+        pre_emo = emo_dict[utt]
+        pre_spk = utt[-4]

@@ -67,18 +67,17 @@ class CRF(nn.Module):
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
                 if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-                    cur_spk = dialog[i][-4]
-                    if (i+1) < len(dialog):
-                        next_spk = dialog[i+1][:-4]
+                    next_spk = dialog[i][-4]
+                    if i > 0:
+                        cur_spk = dialog[i-1][-4]
                     else:
-                        next_spk = cur_spk
+                        cur_spk = next_spk
                 elif args.dataset == 'meld':
-                    cur_spk = dialog[i][:-4]
-                    if (i+1) < len(dialog):
-                        next_spk = dialog[i+1][:-4]
+                    next_spk = dialog[i][:-4]
+                    if i > 0:
+                        cur_spk = dialog[i-1][:-4]
                     else:
-                        next_spk = cur_spk
-                
+                        cur_spk = next_spk
                 if next_spk != cur_spk:
                     trans_score = self.transitions_inter[next_tag].view(1, -1)
                 else:
@@ -119,17 +118,17 @@ class CRF(nn.Module):
         emos = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), emos])
         for i, feat in enumerate(feats):
             if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-                cur_spk = dialog[i][-4]
-                if (i+1) < len(dialog):
-                    next_spk = dialog[i+1][:-4]
+                next_spk = dialog[i][-4]
+                if i > 0:
+                    cur_spk = dialog[i-1][-4]
                 else:
-                    next_spk = cur_spk
+                    cur_spk = next_spk
             elif args.dataset == 'meld':
-                cur_spk = dialog[i][:-4]
-                if (i+1) < len(dialog):
-                    next_spk = dialog[i+1][:-4]
+                next_spk = dialog[i][:-4]
+                if i > 0:
+                    cur_spk = dialog[i-1][:-4]
                 else:
-                    next_spk = cur_spk
+                    cur_spk = next_spk
 
             if next_spk != cur_spk:
                 score = score + self.transitions_inter[emos[i + 1], emos[i]] + feat[emos[i + 1]]
@@ -158,17 +157,17 @@ class CRF(nn.Module):
                 # We don't include the emission scores here because the max
                 # does not depend on them (we add them in below)
                 if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-                    cur_spk = dialog[i][-4]
-                    if (i+1) < len(dialog):
-                        next_spk = dialog[i+1][:-4]
+                    next_spk = dialog[i][-4]
+                    if i > 0:
+                        cur_spk = dialog[i-1][-4]
                     else:
-                        next_spk = cur_spk
+                        cur_spk = next_spk
                 elif args.dataset == 'meld':
-                    cur_spk = dialog[i][:-4]
-                    if (i+1) < len(dialog):
-                        next_spk = dialog[i+1][:-4]
+                    next_spk = dialog[i][:-4]
+                    if i > 0:
+                        cur_spk = dialog[i-1][:-4]
                     else:
-                        next_spk = cur_spk
+                        cur_spk = next_spk
                     
                 if next_spk != cur_spk:
                     next_tag_var = forward_var + self.transitions_inter[next_tag]
@@ -215,7 +214,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original\niemocap_U2U\nmeld", default = 'iemocap_U2U')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original\niemocap_U2U\nmeld", default = 'meld')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
 
@@ -225,7 +224,7 @@ if __name__ == "__main__":
     #EMBEDDING_DIM = 5
 
     if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-        out_dict = joblib.load('../data/iemocap/outputs.pkl')
+        out_dict = joblib.load('../data/iemocap/outputs_6.pkl')
         dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
         dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
     elif args.dataset == 'meld':
@@ -233,7 +232,7 @@ if __name__ == "__main__":
         dialogs = joblib.load('../data/meld/dialog_meld.pkl')
     
     if args.dataset == 'iemocap_original':
-        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap_6.pkl')
         dias = dialogs_edit
     elif args.dataset == 'iemocap_U2U':
         emo_dict = joblib.load('../data/iemocap/U2U_6emo_all_iemocap.pkl')
@@ -316,7 +315,7 @@ if __name__ == "__main__":
             predict += model(precheck_dia, test_data[i][0])[1]
 
     if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-        ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
+        ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap_6.pkl')
     elif args.dataset == 'meld':
         ori_emo_dict = joblib.load('../data/meld/emo_all_meld.pkl')
 
