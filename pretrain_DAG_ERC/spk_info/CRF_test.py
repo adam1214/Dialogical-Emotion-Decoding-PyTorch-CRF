@@ -161,7 +161,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original\niemocap_U2U\nmeld", default = 'meld')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original\niemocap_U2U\nmeld", default = 'iemocap_U2U')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
 
@@ -169,12 +169,12 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/iemocap/outputs.pkl')
+    out_dict = joblib.load('../data/iemocap/outputs_6.pkl')
     dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
     dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
     
     if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-        out_dict = joblib.load('../data/iemocap/outputs.pkl')
+        out_dict = joblib.load('../data/iemocap/outputs_6.pkl')
         dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
         dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
     elif args.dataset == 'meld':
@@ -280,13 +280,16 @@ if __name__ == "__main__":
     
     # inference
     predict = []
+    pred_dict = {}
     with torch.no_grad():
         for i in range(0, len(test_data), 1):
             precheck_dia = prepare_dialog(test_data[i][0], utt_to_ix)
             predict += model(precheck_dia)[1]
+            for j, utt in enumerate(test_data[i][0]):
+                pred_dict[utt] = model(precheck_dia)[1][j]
 
     if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-        ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
+        ori_emo_dict = joblib.load('../data/iemocap/emo_all_iemocap_6.pkl')
     elif args.dataset == 'meld':
         ori_emo_dict = joblib.load('../data/meld/emo_all_meld.pkl')
 
@@ -324,4 +327,11 @@ if __name__ == "__main__":
     f = open(path, 'a')
     f.write(str(f1)+'\n')
     f.close()
+    
+    if args.dataset == 'iemocap_original':
+        joblib.dump(pred_dict, './model/iemocap/original/preds_6.pkl')
+    elif args.dataset == 'iemocap_U2U':
+        joblib.dump(pred_dict, './model/iemocap/U2U/preds_6.pkl')
+    elif args.dataset == 'meld':
+        joblib.dump(pred_dict, './model/meld/preds_6.pkl')
     

@@ -185,8 +185,8 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='bert_iaan')
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     args = parser.parse_args()
 
     START_TAG = "<START>"
@@ -297,26 +297,42 @@ if __name__ == "__main__":
     
     # inference
     predict = []
+    pred_dict = {}
     with torch.no_grad():
         for i in range(0, len(test_data_Ses01), 1):
             precheck_dia = prepare_dialog(test_data_Ses01[i][0], utt_to_ix)
-            predict += model_1(precheck_dia, test_data_Ses01[i][0])[1]
+            tmp = model_1(precheck_dia, test_data_Ses01[i][0])[1]
+            predict += tmp
+            for j, utt in enumerate(test_data_Ses01[i][0]):
+                pred_dict[utt] = tmp[j]
         
         for i in range(0, len(test_data_Ses02), 1):
             precheck_dia = prepare_dialog(test_data_Ses02[i][0], utt_to_ix)
-            predict += model_2(precheck_dia, test_data_Ses02[i][0])[1]
+            tmp = model_2(precheck_dia, test_data_Ses02[i][0])[1]
+            predict += tmp
+            for j, utt in enumerate(test_data_Ses02[i][0]):
+                pred_dict[utt] = tmp[j]
             
         for i in range(0, len(test_data_Ses03), 1):
             precheck_dia = prepare_dialog(test_data_Ses03[i][0], utt_to_ix)
-            predict += model_3(precheck_dia, test_data_Ses03[i][0])[1]
+            tmp = model_3(precheck_dia, test_data_Ses03[i][0])[1]
+            predict += tmp
+            for j, utt in enumerate(test_data_Ses03[i][0]):
+                pred_dict[utt] = tmp[j]
             
         for i in range(0, len(test_data_Ses04), 1):
             precheck_dia = prepare_dialog(test_data_Ses04[i][0], utt_to_ix)
-            predict += model_4(precheck_dia, test_data_Ses04[i][0])[1]
+            tmp = model_4(precheck_dia, test_data_Ses04[i][0])[1]
+            predict += tmp
+            for j, utt in enumerate(test_data_Ses04[i][0]):
+                pred_dict[utt] = tmp[j]
         
         for i in range(0, len(test_data_Ses05), 1):
             precheck_dia = prepare_dialog(test_data_Ses05[i][0], utt_to_ix)
-            predict += model_5(precheck_dia, test_data_Ses05[i][0])[1]
+            tmp = model_5(precheck_dia, test_data_Ses05[i][0])[1]
+            predict += tmp
+            for j, utt in enumerate(test_data_Ses05[i][0]):
+                pred_dict[utt] = tmp[j]
 
     ori_emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
     label = []
@@ -327,3 +343,5 @@ if __name__ == "__main__":
     print('UAR:', uar)
     print('ACC:', acc)
     print(conf)
+
+    joblib.dump(pred_dict, './model/' + args.pretrain_version + '/' + args.dataset + '/preds_4.pkl')

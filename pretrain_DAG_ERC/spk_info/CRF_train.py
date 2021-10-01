@@ -163,7 +163,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original\niemocap_U2U\nmeld", default = 'meld')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use?\niemocap_original\niemocap_U2U\nmeld", default = 'iemocap_U2U')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
     
@@ -173,12 +173,12 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/iemocap/outputs.pkl')
+    out_dict = joblib.load('../data/iemocap/outputs_6.pkl')
     dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
     dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
     
     if args.dataset == 'iemocap_original' or args.dataset == 'iemocap_U2U':
-        out_dict = joblib.load('../data/iemocap/outputs.pkl')
+        out_dict = joblib.load('../data/iemocap/outputs_6.pkl')
         dialogs = joblib.load('../data/iemocap/dialog_iemocap.pkl')
         dialogs_edit = joblib.load('../data/iemocap/dialog_6emo_iemocap.pkl')
     elif args.dataset == 'meld':
@@ -186,7 +186,7 @@ if __name__ == "__main__":
         dialogs = joblib.load('../data/meld/dialog_spk_split_meld.pkl')
     
     if args.dataset == 'iemocap_original':
-        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap.pkl')
+        emo_dict = joblib.load('../data/iemocap/emo_all_iemocap_6.pkl')
         dias = dialogs_edit
     elif args.dataset == 'iemocap_U2U':
         emo_dict = joblib.load('../data/iemocap/U2U_6emo_all_iemocap.pkl')
