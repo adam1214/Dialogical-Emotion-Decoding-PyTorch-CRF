@@ -8,8 +8,8 @@
 || Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
 | --------------------- | -------------------------- | -------------------------------- | --- | --- |
 | Pretrained Classifier |67.1|65.3|||
-| sequential_utt        |71.05|69.28|68.46|66.57|
-| spk_info              |**73.21**|**71.67**|70.49|68.83|
+| sequential_crf       |71.05|69.28|68.46|66.57|
+| intra_crf              |**73.21**|**71.67**|70.49|68.83|
 | dual_crf              |71.58|70.11|69.09|67.18|
 | weighted_dual_crf     |71.69|70.22|68.77|66.97|
 | attention_dual_crf (logit)    |71.23|69.90|68.64|66.79|
@@ -24,8 +24,8 @@
 || Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
 | --------------------- | -------------------------- | -------------------------------- | --- | --- |
 | Pretrained Classifier |65.02|64.17|||
-| sequential_utt        |68.22|67.02|67.20|65.97|
-| spk_info              |69.11+-.28|68.24+-.25|68.52|67.69|
+| sequential_crf        |68.22|67.02|67.20|65.97|
+| intra_crf              |69.11+-.28|68.24+-.25|68.52|67.69|
 | dual_crf              |69.38|68.72|67.17|66.01|
 | weighted_dual_crf     |68.75|68.02|68.01|66.77|
 | attention_dual_crf (logit)    |69.12|68.32|66.10|64.69|
@@ -42,8 +42,8 @@
 || Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
 | --------------------- | -------------------------- | -------------------------------- | --- | --- |
 | Pretrained Classifier |59.80|58.45|||
-| sequential_utt        |65.82|64.62|62.91|61.45|
-| spk_info              |**69.07+-.21**|**68.07+-.21**|64.54|63.26|
+| sequential_crf        |65.82|64.62|62.91|61.45|
+| intra_crf              |**69.07+-.21**|**68.07+-.21**|64.54|63.26|
 | dual_crf              |65.97|65.16|64.45|63.23|
 | weighted_dual_crf     |66.62|65.56|63.93|62.65|
 | attention_dual_crf (logit)    |67.14|67.15|64.49|62.57|
@@ -64,8 +64,8 @@
 || Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
 | --------------------- | -------------------------- | -------------------------------- | --- | --- |
 | Pretrained Classifier |76.01|75.21|||
-| sequential_utt        |78.36|77.80|77.22|76.50|
-| spk_info              |**81.62**|**81.07**|79.76|78.94|
+| sequential_crf        |78.36|77.80|77.22|76.50|
+| intra_crf              |**81.62**|**81.07**|79.76|78.94|
 | dual_crf              |78.50|77.87|76.88|76.28|
 | weighted_dual_crf     |78.83|78.23|76.84|76.21|
 | attention_dual_crf (logit)    |78.67|77.98|76.61|75.79|
@@ -82,8 +82,8 @@
 || Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|Utt to Utt Training Data weighted F1|
 | -- | -- | -- | -- | -- | -- | -- |
 | Pretrained Classifier|66.22|67.76|67.87||||
-| sequential_utt|66.44+-.36|67.79+-.13|67.95+-.13|66.34+-.25|67.71+-.20|67.87+-.19|
-| spk_info|66.44+-.67|67.86+-.57|68.04+-.59|66.73+-.53|68.29+-.39|68.47+-.40|
+| sequential_crf|66.44+-.36|67.79+-.13|67.95+-.13|66.34+-.25|67.71+-.20|67.87+-.19|
+| intra_crf|66.44+-.67|67.86+-.57|68.04+-.59|66.73+-.53|68.29+-.39|68.47+-.40|
 | dual_crf|65.72|67.39|67.50|66.14|68.06|68.13|
 | weighted_dual_crf|66.83|67.88|68.03|64.88|67.02|67.09|
 
@@ -98,7 +98,7 @@
 || Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|Utt to Utt Training Data weighted F1|
 | -- | -- | -- | -- | -- | -- | -- |
 | Pretrained Classifier|83.11|82.27|82.39||||
-| sequential_utt|82.98|82.19|82.28||||
+| sequential_crf|82.98|82.19|82.28||||
 
 --------------------------------------------------
 *    Dataset:IEMOCAP 
@@ -115,7 +115,7 @@
 || Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|Utt to Utt Training Data weighted F1|
 | -- | -- | -- | -- | -- | -- | -- |
 | Pretrained Classifier|77.23|77.25|77.24||||
-| sequential_utt|76.75|76.80|76.71||||
+| sequential_crf|76.75|76.80|76.71||||
 
 --------------------------------------------------
 *    Dataset:MELD
@@ -126,7 +126,7 @@
 || Original Training Data UAR | Original Training Data ACC | Original Training Data weighted F1 |
 | -- | -- | -- | -- |
 | Pretrained Classifier|48.65|63.83|63.43|
-| sequential_utt|48.57+-.24|63.72+-.09|63.35+-.11|
-| spk_info|48.66+-.27|63.81+-.09|63.42+-.10|
+| sequential_crf|48.57+-.24|63.72+-.09|63.35+-.11|
+| intra_crf|48.66+-.27|63.81+-.09|63.42+-.10|
 | dual_crf|48.67|64.10|63.70|
 | weighted_dual_crf|48.57|64.02|63.64|

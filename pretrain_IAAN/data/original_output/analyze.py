@@ -94,5 +94,6 @@ if __name__ == '__main__':
             labels.append(emo2num[emo_dict[utt]])
             predicts.append(outputs[utt].argmax())
     print('Total UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
+    print('Total ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
     
     analyze_case1_2_3(emo_dict, outputs, dialog, emo2num)
