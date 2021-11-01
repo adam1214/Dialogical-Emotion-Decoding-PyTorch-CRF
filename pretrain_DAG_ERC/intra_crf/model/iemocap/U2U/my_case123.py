@@ -4,13 +4,15 @@ import pdb
 import numpy as np 
 
 def gen_case1_2_3_dict(case1_dict, case2_dict, case3_dict, spkID, emo_dict, dialog):
-    emo = ['ang', 'hap', 'neu', 'sad']
+    #emo = ['ang', 'hap', 'neu', 'sad']
     for dialog_name in dialog:
+        if dialog_name[4] != '5':
+            continue
         U_p_emo = ""
         U_p = ""
         for t in range(0, len(dialog[dialog_name]), 1):
             if dialog[dialog_name][t][-4] == spkID:
-                if emo_dict[dialog[dialog_name][t]] in emo and U_p_emo != "" and dialog[dialog_name][t][-4] != dialog[dialog_name][t-1][-4]:
+                if U_p_emo != "" and dialog[dialog_name][t][-4] != dialog[dialog_name][t-1][-4]:
                     U_c_emo = emo_dict[dialog[dialog_name][t]]
                     U_r_emo = emo_dict[dialog[dialog_name][t-1]]
                     U_c = dialog[dialog_name][t]
@@ -62,7 +64,6 @@ def analyze_case1_2_3(emo_dict, outputs, dialog, emo2num):
     case3_dict = {}
     gen_case1_2_3_dict(case1_dict, case2_dict, case3_dict, 'M', emo_dict, dialog)
     gen_case1_2_3_dict(case1_dict, case2_dict, case3_dict, 'F', emo_dict, dialog)
-    
     total_case = len(case1_dict) + len(case2_dict) + len(case3_dict)
     print('Data points for case_1:', round(len(case1_dict)*100/total_case, 2), '%')
     print('Data points for case_2:', round(len(case2_dict)*100/total_case, 2), '%')
@@ -76,11 +77,11 @@ def analyze_case1_2_3(emo_dict, outputs, dialog, emo2num):
     print("case 3:", round(accuracy_score(labels, predicts)*100, 2), '%')
     
 if __name__ == '__main__':
-    dialog = joblib.load('../../../../data/dialog_iemocap.pkl')
-    dialog_edit = joblib.load('../../../../data/dialog_4emo_iemocap.pkl')
-    emo_dict = joblib.load('../../../../data/emo_all_iemocap.pkl')
-    outputs = joblib.load('./preds_4.pkl')
-    emo2num = {'ang': 0, 'hap': 1, 'neu': 2, 'sad': 3}
+    #dialog = joblib.load('../../../../data/iemocap/dialog_iemocap.pkl')
+    dialog_edit = joblib.load('../../../../data/iemocap/dialog_6emo_iemocap.pkl')
+    emo_dict = joblib.load('../../../../data/iemocap/emo_all_iemocap_6.pkl')
+    outputs = joblib.load('./preds_6.pkl')
+    emo2num = {'exc':0, 'neu':1, 'fru':2, 'sad':3, 'hap':4, 'ang':5}
     
     emo_set = set()
     for k in emo_dict:
@@ -92,10 +93,10 @@ if __name__ == '__main__':
     predicts = []
     for dialog_name in dialog_edit:
         for utt in dialog_edit[dialog_name]:
-            labels.append(emo2num[emo_dict[utt]])
-            predicts.append(outputs[utt])
+            if utt[4] == '5':
+                labels.append(emo2num[emo_dict[utt]])
+                predicts.append(outputs[utt])
             
-    print('Total UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
-    print('Total ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
+    print('Total weighted f1:', round(f1_score(labels, predicts, average='weighted')*100, 2), '%')
     
-    analyze_case1_2_3(emo_dict, outputs, dialog, emo2num)
+    analyze_case1_2_3(emo_dict, outputs, dialog_edit, emo2num)
