@@ -118,6 +118,23 @@
 | sequential_crf|76.75|76.80|76.71||||
 
 --------------------------------------------------
+*    Dataset:IEMOCAP 
+        *    4 emotions (ang, hap, neu, sad)
+        *    5 fold, 5 model
+                * fold 5: the last 20 dialogs in session 4 are val set
+                * fold 4: the last 20 dialogs in session 5 are val set
+                * fold 3: the last 20 dialogs in session 1 are val set
+                * fold 2: the last 20 dialogs in session 3 are val set
+                * fold 1: the last 20 dialogs in session 2 are val set
+        *    10 run: avg+-sample_std
+*    Pre-trained classifier:DAG-ERC
+
+|| Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
+| -- | -- | -- | -- | -- |
+| Pretrained Classifier|68.46|66.82|||||
+| intra_crf|67.61|66.19|||||
+
+--------------------------------------------------
 *    Dataset:MELD
         *    7 emotions (anger, disgust, fear, joy, neutral, sadness, surprise)
         *    10 run: avg+-sample_std
