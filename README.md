@@ -127,8 +127,11 @@
                 * fold 2: the last 20 dialogs in session 3 are val set
                 * fold 1: the last 20 dialogs in session 2 are val set
         *    10 run: avg+-sample_std
-*    Pre-trained classifier:DAG-ERC
-
+*    Pre-trained classifier:DAG-ERC with openSMILE feature
+        *    Raw feature shape: (time_frames, 45)
+        *    After preprocessing: (90,1)
+                * Concat two 45 dims feature, one is mean, and the other is std 
+    
 || Original Training Data UAR | Original Training Data ACC |Utt to Utt Training Data UAR|Utt to Utt Training Data ACC|
 | -- | -- | -- | -- | -- |
 | Pretrained Classifier|68.46|66.82|||||
