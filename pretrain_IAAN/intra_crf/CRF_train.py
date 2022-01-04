@@ -8,6 +8,7 @@ import argparse
 from argparse import RawTextHelpFormatter
 import utils
 import matplotlib.pyplot as plt
+import pdb
 
 def argmax(vec):
     # return the argmax as a python int
@@ -37,7 +38,7 @@ class CRF(nn.Module):
 
         # Matrix of transition parameters.  Entry i,j is the score of
         # transitioning *to* i *from* j.
-        self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
+        self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)*0.01) #6*6
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -46,7 +47,7 @@ class CRF(nn.Module):
 
     def _forward_alg(self, feats):
         # Do the forward algorithm to compute the partition function
-        init_alphas = torch.full((1, self.tagset_size), -10000.)
+        init_alphas = torch.full((1, self.tagset_size), -10000.).to(device)
         # START_TAG has all of the score.
         init_alphas[0][self.emo_to_ix[START_TAG]] = 0.
 
@@ -92,11 +93,11 @@ class CRF(nn.Module):
                 output_vals[i][5] = -3.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
-        return pretrain_model_feats # tensor: (utt數量) * (情緒數量+2)
+        return pretrain_model_feats.to(device) # tensor: (utt數量) * (情緒數量+2)
 
     def _score_sentence(self, feats, tags):
         # Gives the score of a provided tag sequence
-        score = torch.zeros(1)
+        score = torch.zeros(1).to(device)
         tags = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), tags])
         for i, feat in enumerate(feats):
             score = score + \
@@ -108,7 +109,7 @@ class CRF(nn.Module):
         backpointers = []
 
         # Initialize the viterbi variables in log space
-        init_vvars = torch.full((1, self.tagset_size), -10000.)
+        init_vvars = torch.full((1, self.tagset_size), -10000.).to(device)
         init_vvars[0][self.emo_to_ix[START_TAG]] = 0
 
         # forward_var at step i holds the viterbi variables for step i-1
@@ -163,12 +164,15 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
     parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=5)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
-
+    print(args)
+    #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
+    print(device)
     torch.manual_seed(args.seed)
     
     START_TAG = "<START>"
@@ -176,15 +180,14 @@ if __name__ == "__main__":
     #EMBEDDING_DIM = 5
 
     out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
-    dialogs = joblib.load('../data/dialog_iemocap.pkl')
-    dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
+    #dialogs = joblib.load('../data/dialog_iemocap.pkl')
+    #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
+    dialogs = joblib.load('../data/dialog_rearrange.pkl')
+    dialogs_edit = joblib.load('../data/dialog_rearrange_4emo_iemocap.pkl')
     
     if args.dataset == 'original':
         emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
-    elif args.dataset == 'C2C':
-        emo_dict = joblib.load('../data/C2C_4emo_all_iemocap.pkl')
-        dias = dialogs
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
@@ -345,13 +348,14 @@ if __name__ == "__main__":
             label_val[i] = -1
     
     model = CRF(len(utt_to_ix), emo_to_ix)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-2, momentum=0.5)
+    model.to(device)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-2, momentum=0.5)
 
     max_uar_val = 0
     best_epoch = -1
     loss_list = []
     val_loss_list = []
-    for epoch in range(10):
+    for epoch in range(30):
         print('Epoch', epoch)
         for dialog, emos in train_data:
             # Step 1. Remember that Pytorch accumulates gradients.
