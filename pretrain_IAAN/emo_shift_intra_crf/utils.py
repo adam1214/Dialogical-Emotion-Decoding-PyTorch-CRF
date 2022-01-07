@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.metrics import confusion_matrix, recall_score, accuracy_score
+import pdb
 
 def convert_to_index(emotion):
     """convert emotion to index """
@@ -83,8 +84,10 @@ def get_val_bias(dialog, emo_dict):
       p_0, _ = transition_bias(dialog, emo_dict, val)
       print("Transition bias of { %s }: %.3f" % (' ,'.join(train_sessions), p_0))
       bias_dict[val] = p_0
-
-    return bias_dict
+    bias_dict_per_utt = {}
+    for k in emo_dict:
+        bias_dict_per_utt[k] = bias_dict[k[:5]]
+    return bias_dict_per_utt
 
 def emo_trans_prob_BI_without_softmax_intra(emo_dict, dialogs, val=None):
     # only estimate anger, happiness, neutral, sadness

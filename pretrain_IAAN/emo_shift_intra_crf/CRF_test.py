@@ -8,6 +8,7 @@ import argparse
 from argparse import RawTextHelpFormatter
 import utils
 from sklearn.metrics import confusion_matrix, recall_score, accuracy_score
+from CRF_train import CRF
 
 def argmax(vec):
     # return the argmax as a python int
@@ -26,198 +27,12 @@ def log_sum_exp(vec):
     max_score_broadcast = max_score.view(1, -1).expand(1, vec.size()[1])
     return max_score + \
         torch.log(torch.sum(torch.exp(vec - max_score_broadcast)))
-        
-class CRF(nn.Module):
-
-    def __init__(self, vocab_size, emo_to_ix):
-        super(CRF, self).__init__()
-        self.vocab_size = vocab_size
-        self.emo_to_ix = emo_to_ix
-        self.tagset_size = len(emo_to_ix)
-
-        # Matrix of transition parameters.  Entry i,j is the score of
-        # transitioning *to* i *from* j.
-        self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)*0.01) #6*6
-        self.weight_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2)*0.01) #[4]
-        self.distribution_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2, self.tagset_size-3)*0.01) #4*3
-        self.distribution_softmax = nn.Softmax(dim=0)
-        
-        # These two statements enforce the constraint that we never transfer
-        # to the start tag and we never transfer from the stop tag
-        self.transitions.data[emo_to_ix[START_TAG], :] = -10000
-        self.transitions.data[:, emo_to_ix[STOP_TAG]] = -10000
-        '''
-            0	            1	            2	            3	            4	            5        (start point)
-        0	-0.015255959	-0.007502318	-0.006539809	-0.016094847	-0.0010016718	-10000.0
-        1	-0.009797722	-0.016090963	-0.007121446	0.0030372199	-0.007773143	-10000.0
-        2	-0.002222705	0.016871134	    0.0022842516	0.004676355	    -0.0069697243	-10000.0
-        3	0.0069954237	0.0019908163	0.001990565	    0.00045702778	0.0015295692	-10000.0
-        4	-10000.0	   -10000.0	        -10000.0	    -10000.0	    -10000.0	    -10000.0
-        5	0.015747981	   -0.006298472	    0.02406978	    0.0027856624	0.0024675291	-10000.0
-        (end point)
-        '''
-        
-    def _forward_alg(self, feats, dialog):
-        # Do the forward algorithm to compute the partition function
-        init_alphas = torch.full((1, self.tagset_size), -10000.).to(device)
-        # START_TAG has all of the score.
-        init_alphas[0][self.emo_to_ix[START_TAG]] = 0.
-
-        # Wrap in a variable so that we will get automatic backprop
-        forward_var = init_alphas
-
-        # Iterate through the sentence
-        for i, feat in enumerate(feats):
-            alphas_t = []  # The forward tensors at this timestep
-            for next_tag in range(self.tagset_size):
-                # broadcast the emission score: it is the same regardless of
-                # the previous tag
-                emit_score = feat[next_tag].view(
-                    1, -1).expand(1, self.tagset_size)
-                # the ith entry of trans_score is the score of transitioning to
-                # next_tag from i
-                if next_tag < 4: # 0 1 2 3
-                    multiplier = torch.ones(self.tagset_size) * -1.
-                    distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[next_tag]
-                    
-                    k = 0 # index for distributed_rate, 0 1 2
-                    for j in range(0, self.tagset_size-2, 1):
-                        if j != next_tag:
-                            multiplier[j] = distributed_rate[k]
-                            k += 1
-                            
-                    trans_score = ( self.transitions[next_tag] + bias_dict[dialog[i][:5]]*torch.cat([self.weight_for_emo_shift, torch.zeros(2)])*multiplier ).view(1, -1)
-                else:
-                    trans_score = self.transitions[next_tag].view(1, -1)
-                # The ith entry of next_tag_var is the value for the
-                # edge (i -> next_tag) before we do log-sum-exp
-                next_tag_var = forward_var + trans_score + emit_score
-                # The forward variable for this tag is log-sum-exp of all the
-                # scores.
-                alphas_t.append(log_sum_exp(next_tag_var).view(1))
-            forward_var = torch.cat(alphas_t).view(1, -1)
-        terminal_var = forward_var + self.transitions[self.emo_to_ix[STOP_TAG]]
-        alpha = log_sum_exp(terminal_var)
-        return alpha
-
-    def _get_pretrain_model_features(self, dialog):
-        output_vals = np.zeros((len(dialog), 4+2))
-        for i in range(0, len(dialog), 1):
-            output_vals[i][0] = out_dict[ix_to_utt[dialog[i].item()]][0]
-            output_vals[i][1] = out_dict[ix_to_utt[dialog[i].item()]][1]
-            output_vals[i][2] = out_dict[ix_to_utt[dialog[i].item()]][2]
-            output_vals[i][3] = out_dict[ix_to_utt[dialog[i].item()]][3]
-            if i == 0:
-                output_vals[i][4] = 3.0
-            else:
-                output_vals[i][4] = -3.0
-            if i == len(dialog)-1:
-                output_vals[i][5] = 3.0
-            else:
-                output_vals[i][5] = -3.0
-            
-        pretrain_model_feats = torch.from_numpy(output_vals)
-        return pretrain_model_feats.to(device) # tensor: (utt數量) * (情緒數量+2)
-
-    def _score_sentence(self, feats, tags, dialog):
-        # Gives the score of a provided tag sequence
-        score = torch.zeros(1).to(device)
-        tags = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), tags])
-        for i, feat in enumerate(feats):
-            if (i + 1) < 4 and i < 4: # both in 0, 1, 2, 3
-                multiplier = torch.ones(self.tagset_size) * -1.
-                distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[i+1]
-                
-                k = 0 # index for distributed_rate, 0 1 2
-                for j in range(0, self.tagset_size-2, 1):
-                    if j != (i + 1):
-                        multiplier[j] = distributed_rate[k]
-                        k += 1
-                
-                trans_score = self.transitions[tags[i + 1], tags[i]] + bias_dict[dialog[i][:5]]*self.weight_for_emo_shift[i]*multiplier[i]
-                
-            else:
-                trans_score = self.transitions[tags[i + 1], tags[i]]
-            score = score + trans_score + feat[tags[i + 1]]
-        score = score + self.transitions[self.emo_to_ix[STOP_TAG], tags[-1]]
-        return score
-
-    def _viterbi_decode(self, feats, dialog):
-        backpointers = []
-
-        # Initialize the viterbi variables in log space
-        init_vvars = torch.full((1, self.tagset_size), -10000.).to(device)
-        init_vvars[0][self.emo_to_ix[START_TAG]] = 0
-
-        # forward_var at step i holds the viterbi variables for step i-1
-        forward_var = init_vvars
-        for i, feat in enumerate(feats):
-            bptrs_t = []  # holds the backpointers for this step
-            viterbivars_t = []  # holds the viterbi variables for this step
-            for next_tag in range(self.tagset_size):
-                # next_tag_var[i] holds the viterbi variable for tag i at the
-                # previous step, plus the score of transitioning
-                # from tag i to next_tag.
-                # We don't include the emission scores here because the max
-                # does not depend on them (we add them in below)
-                
-                if next_tag < 4: # 0 1 2 3
-                    multiplier = torch.ones(self.tagset_size) * -1.
-                    distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[next_tag]
-                    
-                    k = 0 # index for distributed_rate, 0 1 2
-                    for j in range(0, self.tagset_size-2, 1):
-                        if j != next_tag:
-                            multiplier[j] = distributed_rate[k]
-                            k += 1
-                            
-                    trans_score = self.transitions[next_tag] + bias_dict[dialog[i][:5]]*torch.cat([self.weight_for_emo_shift, torch.zeros(2)])*multiplier
-                else:
-                    trans_score = self.transitions[next_tag]
-                
-                next_tag_var = forward_var + trans_score
-                best_tag_id = argmax(next_tag_var)
-                bptrs_t.append(best_tag_id)
-                viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
-            # Now add in the emission scores, and assign forward_var to the set
-            # of viterbi variables we just computed
-            forward_var = (torch.cat(viterbivars_t) + feat).view(1, -1)
-            backpointers.append(bptrs_t)
-
-        # Transition to STOP_TAG
-        terminal_var = forward_var + self.transitions[self.emo_to_ix[STOP_TAG]]
-        best_tag_id = argmax(terminal_var)
-        path_score = terminal_var[0][best_tag_id]
-
-        # Follow the back pointers to decode the best path.
-        best_path = [best_tag_id]
-        for bptrs_t in reversed(backpointers):
-            best_tag_id = bptrs_t[best_tag_id]
-            best_path.append(best_tag_id)
-        # Pop off the start tag (we dont want to return that to the caller)
-        start = best_path.pop()
-        assert start == self.emo_to_ix[START_TAG]  # Sanity check
-        best_path.reverse()
-        return path_score, best_path
-
-    def neg_log_likelihood(self, sentence, tags, dialog):
-        feats = self._get_pretrain_model_features(sentence)
-        forward_score = self._forward_alg(feats, dialog)
-        gold_score = self._score_sentence(feats, tags, dialog)
-        return forward_score - gold_score
-
-    def forward(self, sentence, dialog):  # dont confuse this with _forward_alg above, this for model predicting
-        # Get the emission scores from the BiLSTM
-        pretrain_model_feats = self._get_pretrain_model_features(sentence)
-
-        # Find the best path, given the features.
-        score, tag_seq = self._viterbi_decode(pretrain_model_feats, dialog)
-        return score, tag_seq
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
+    parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'constant')
     args = parser.parse_args()
     
     print(args)
@@ -242,8 +57,11 @@ if __name__ == "__main__":
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
         
-    spk_dialogs = utils.split_dialog(dialogs)
-    bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
+    if args.emo_shift == 'constant':
+        spk_dialogs = utils.split_dialog(dialogs)
+        bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
+    else:
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/SVM_emo_shift_output.pkl')
     
     test_data_Ses01 = []
     test_data_Ses02 = []
@@ -352,31 +170,31 @@ if __name__ == "__main__":
     emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
 
     # Load model
-    model_1 = CRF(len(utt_to_ix), emo_to_ix)
+    model_1 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_1.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
 
-    model_2 = CRF(len(utt_to_ix), emo_to_ix)
+    model_2 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_2.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
 
-    model_3 = CRF(len(utt_to_ix), emo_to_ix)
+    model_3 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_3.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
 
-    model_4 = CRF(len(utt_to_ix), emo_to_ix)
+    model_4 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_4.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
 
-    model_5 = CRF(len(utt_to_ix), emo_to_ix)
+    model_5 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_5.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])

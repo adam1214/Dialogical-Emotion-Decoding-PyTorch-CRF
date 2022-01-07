@@ -10,6 +10,9 @@ import utils
 import matplotlib.pyplot as plt
 import pdb
 
+START_TAG = "<START>"
+STOP_TAG = "<STOP>"
+
 def argmax(vec):
     # return the argmax as a python int
     _, idx = torch.max(vec, 1)
@@ -30,17 +33,22 @@ def log_sum_exp(vec):
         
 class CRF(nn.Module):
 
-    def __init__(self, vocab_size, emo_to_ix):
+    def __init__(self, vocab_size, emo_to_ix, out_dict, bias_dict, ix_to_utt, device):
         super(CRF, self).__init__()
         self.vocab_size = vocab_size
         self.emo_to_ix = emo_to_ix
         self.tagset_size = len(emo_to_ix)
-
+        self.out_dict = out_dict
+        self.bias_dict = bias_dict
+        self.ix_to_utt = ix_to_utt
+        self.device = device
+        
         # Matrix of transition parameters.  Entry i,j is the score of
         # transitioning *to* i *from* j.
-        self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)*0.01) #6*6
-        self.weight_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2)*0.01) #[4]
-        self.distribution_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2, self.tagset_size-3)*0.01) #4*3
+        self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
+        self.weight_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
+        self.activate_fun = nn.Tanh()
+        self.distribution_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2, self.tagset_size-3)) #4*3
         self.distribution_softmax = nn.Softmax(dim=0)
         
         # These two statements enforce the constraint that we never transfer
@@ -60,7 +68,7 @@ class CRF(nn.Module):
         
     def _forward_alg(self, feats, dialog):
         # Do the forward algorithm to compute the partition function
-        init_alphas = torch.full((1, self.tagset_size), -10000.).to(device)
+        init_alphas = torch.full((1, self.tagset_size), -10000.).to(self.device)
         # START_TAG has all of the score.
         init_alphas[0][self.emo_to_ix[START_TAG]] = 0.
 
@@ -77,8 +85,9 @@ class CRF(nn.Module):
                     1, -1).expand(1, self.tagset_size)
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
+                
                 if next_tag < 4: # 0 1 2 3
-                    multiplier = torch.ones(self.tagset_size) * -1.
+                    multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
                     distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[next_tag]
                     
                     k = 0 # index for distributed_rate, 0 1 2
@@ -86,8 +95,7 @@ class CRF(nn.Module):
                         if j != next_tag:
                             multiplier[j] = distributed_rate[k]
                             k += 1
-                            
-                    trans_score = ( self.transitions[next_tag] + bias_dict[dialog[i][:5]]*torch.cat([self.weight_for_emo_shift, torch.zeros(2)])*multiplier ).view(1, -1)
+                    trans_score = ( self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(device)])*multiplier ).view(1, -1)
                 else:
                     trans_score = self.transitions[next_tag].view(1, -1)
                 # The ith entry of next_tag_var is the value for the
@@ -104,10 +112,10 @@ class CRF(nn.Module):
     def _get_pretrain_model_features(self, dialog):
         output_vals = np.zeros((len(dialog), 4+2))
         for i in range(0, len(dialog), 1):
-            output_vals[i][0] = out_dict[ix_to_utt[dialog[i].item()]][0]
-            output_vals[i][1] = out_dict[ix_to_utt[dialog[i].item()]][1]
-            output_vals[i][2] = out_dict[ix_to_utt[dialog[i].item()]][2]
-            output_vals[i][3] = out_dict[ix_to_utt[dialog[i].item()]][3]
+            output_vals[i][0] = self.out_dict[self.ix_to_utt[dialog[i].item()]][0]
+            output_vals[i][1] = self.out_dict[self.ix_to_utt[dialog[i].item()]][1]
+            output_vals[i][2] = self.out_dict[self.ix_to_utt[dialog[i].item()]][2]
+            output_vals[i][3] = self.out_dict[self.ix_to_utt[dialog[i].item()]][3]
             if i == 0:
                 output_vals[i][4] = 3.0
             else:
@@ -118,24 +126,24 @@ class CRF(nn.Module):
                 output_vals[i][5] = -3.0
             
         pretrain_model_feats = torch.from_numpy(output_vals)
-        return pretrain_model_feats.to(device) # tensor: (utt數量) * (情緒數量+2)
+        return pretrain_model_feats.to(self.device) # tensor: (utt數量) * (情緒數量+2)
 
     def _score_sentence(self, feats, tags, dialog):
         # Gives the score of a provided tag sequence
-        score = torch.zeros(1).to(device)
+        score = torch.zeros(1).to(self.device)
         tags = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), tags])
         for i, feat in enumerate(feats):
-            if (i + 1) < 4 and i < 4: # both in 0, 1, 2, 3
-                multiplier = torch.ones(self.tagset_size) * -1.
-                distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[i+1]
+            if tags[i + 1] < 4 and tags[i] < 4: # both in 0, 1, 2, 3
+                multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
+                distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[tags[i + 1]]
                 
                 k = 0 # index for distributed_rate, 0 1 2
                 for j in range(0, self.tagset_size-2, 1):
-                    if j != (i + 1):
+                    if j != tags[i + 1]:
                         multiplier[j] = distributed_rate[k]
                         k += 1
                 
-                trans_score = self.transitions[tags[i + 1], tags[i]] + bias_dict[dialog[i][:5]]*self.weight_for_emo_shift[i]*multiplier[i]
+                trans_score = self.transitions[tags[i + 1], tags[i]] + self.bias_dict[dialog[i]]*(self.activate_fun(self.weight_for_emo_shift))[tags[i]]*multiplier[tags[i]]
                 
             else:
                 trans_score = self.transitions[tags[i + 1], tags[i]]
@@ -147,7 +155,7 @@ class CRF(nn.Module):
         backpointers = []
 
         # Initialize the viterbi variables in log space
-        init_vvars = torch.full((1, self.tagset_size), -10000.).to(device)
+        init_vvars = torch.full((1, self.tagset_size), -10000.).to(self.device)
         init_vvars[0][self.emo_to_ix[START_TAG]] = 0
 
         # forward_var at step i holds the viterbi variables for step i-1
@@ -163,7 +171,7 @@ class CRF(nn.Module):
                 # does not depend on them (we add them in below)
                 
                 if next_tag < 4: # 0 1 2 3
-                    multiplier = torch.ones(self.tagset_size) * -1.
+                    multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
                     distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[next_tag]
                     
                     k = 0 # index for distributed_rate, 0 1 2
@@ -172,7 +180,7 @@ class CRF(nn.Module):
                             multiplier[j] = distributed_rate[k]
                             k += 1
                             
-                    trans_score = self.transitions[next_tag] + bias_dict[dialog[i][:5]]*torch.cat([self.weight_for_emo_shift, torch.zeros(2)])*multiplier
+                    trans_score = self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*multiplier
                 else:
                     trans_score = self.transitions[next_tag]
                 
@@ -205,6 +213,7 @@ class CRF(nn.Module):
         feats = self._get_pretrain_model_features(sentence)
         forward_score = self._forward_alg(feats, dialog)
         gold_score = self._score_sentence(feats, tags, dialog)
+        #return torch.abs(forward_score - gold_score)
         return forward_score - gold_score
 
     def forward(self, sentence, dialog):  # dont confuse this with _forward_alg above, this for model predicting
@@ -218,8 +227,9 @@ class CRF(nn.Module):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
-    parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=5)
+    parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=1)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
+    parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'constant')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
     print(args)
@@ -227,10 +237,6 @@ if __name__ == "__main__":
     device = torch.device("cpu")
     print(device)
     torch.manual_seed(args.seed)
-    
-    START_TAG = "<START>"
-    STOP_TAG = "<STOP>"
-    #EMBEDDING_DIM = 5
 
     out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
     #dialogs = joblib.load('../data/dialog_iemocap.pkl')
@@ -245,8 +251,11 @@ if __name__ == "__main__":
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
     
-    spk_dialogs = utils.split_dialog(dialogs)
-    bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
+    if args.emo_shift == 'constant':
+        spk_dialogs = utils.split_dialog(dialogs)
+        bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
+    else:
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/SVM_emo_shift_output.pkl')
 
     # Make up training data & testing data
     model_num_val_map = {1:'5', 2:'4', 3:'2', 4:'1', 5: '3'}
@@ -403,7 +412,7 @@ if __name__ == "__main__":
         else:
             label_val[i] = -1
     
-    model = CRF(len(utt_to_ix), emo_to_ix)
+    model = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model.to(device)
     optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-2, momentum=0.5)
 
@@ -411,8 +420,7 @@ if __name__ == "__main__":
     best_epoch = -1
     val_loss_list = []
     train_loss_list = []
-    for epoch in range(1, 30+1, 1):
-        print('Epoch', epoch)
+    for epoch in range(1, 60+1, 1):
         train_loss_sum = 0
         for dialog, emos in train_data:
             # Step 1. Remember that Pytorch accumulates gradients.
@@ -448,14 +456,14 @@ if __name__ == "__main__":
                 
         uar_val, acc_val, conf_val = utils.evaluate(predict_val, label_val)
         val_loss_list.append(val_loss_sum/len(val_data))
-
+        
         #Save the best model so far
         if uar_val > max_uar_val:
-            val_loss_sum = 0
             best_epoch = epoch
             max_uar_val = uar_val
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
             torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth') 
+        print('EPOCH:', epoch, ', train_loss:', round(train_loss_list[-1], 4), ', val_loss:', round(val_loss_list[-1], 4), ', val_uar:', round(100 * uar_val, 2), '%')
     print('The Best Epoch:', best_epoch)
 
     plt.plot(np.arange(len(train_loss_list))+1, train_loss_list, 's-', color = 'r', label="train_loss")
