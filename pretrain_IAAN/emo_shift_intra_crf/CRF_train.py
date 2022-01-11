@@ -9,6 +9,7 @@ from argparse import RawTextHelpFormatter
 import utils
 import matplotlib.pyplot as plt
 import pdb
+import math
 
 START_TAG = "<START>"
 STOP_TAG = "<STOP>"
@@ -48,8 +49,11 @@ class CRF(nn.Module):
         self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         self.weight_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
         self.activate_fun = nn.Tanh()
-        self.distribution_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2, self.tagset_size-3)) #4*3
-        self.distribution_softmax = nn.Softmax(dim=0)
+        self.multiplier = nn.Parameter(torch.randn(self.tagset_size-2, self.tagset_size-2)) #4*4
+        self.multiplier_softmax = nn.Softmax(dim=0)
+        self.diagonal_neg_infinity_matrix = torch.zeros(self.tagset_size-2, self.tagset_size-2) #4*4
+        for i in range(0, self.tagset_size-2, 1):
+            self.diagonal_neg_infinity_matrix[i][i] = -math.inf
         
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -87,6 +91,7 @@ class CRF(nn.Module):
                 # next_tag from i
                 
                 if next_tag < 4: # 0 1 2 3
+                    '''
                     multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
                     distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[next_tag]
                     
@@ -95,7 +100,10 @@ class CRF(nn.Module):
                         if j != next_tag:
                             multiplier[j] = distributed_rate[k]
                             k += 1
-                    trans_score = ( self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(device)])*multiplier ).view(1, -1)
+                    '''
+                    multiplier_row = (self.multiplier_softmax(self.multiplier-self.diagonal_neg_infinity_matrix))[next_tag]
+                    multiplier_row[next_tag] = -1
+                    trans_score = ( self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(device)])*torch.cat([multiplier_row, torch.zeros(2).to(device)]) ).view(1, -1)
                 else:
                     trans_score = self.transitions[next_tag].view(1, -1)
                 # The ith entry of next_tag_var is the value for the
@@ -134,6 +142,7 @@ class CRF(nn.Module):
         tags = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), tags])
         for i, feat in enumerate(feats):
             if tags[i + 1] < 4 and tags[i] < 4: # both in 0, 1, 2, 3
+                '''
                 multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
                 distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[tags[i + 1]]
                 
@@ -142,8 +151,10 @@ class CRF(nn.Module):
                     if j != tags[i + 1]:
                         multiplier[j] = distributed_rate[k]
                         k += 1
-                
-                trans_score = self.transitions[tags[i + 1], tags[i]] + self.bias_dict[dialog[i]]*(self.activate_fun(self.weight_for_emo_shift))[tags[i]]*multiplier[tags[i]]
+                '''
+                multiplier_row = (self.multiplier_softmax(self.multiplier-self.diagonal_neg_infinity_matrix))[tags[i + 1]]
+                multiplier_row[tags[i + 1]] = -1
+                trans_score = self.transitions[tags[i + 1], tags[i]] + self.bias_dict[dialog[i]]*(self.activate_fun(self.weight_for_emo_shift))[tags[i]]*multiplier_row[tags[i]]
                 
             else:
                 trans_score = self.transitions[tags[i + 1], tags[i]]
@@ -171,6 +182,7 @@ class CRF(nn.Module):
                 # does not depend on them (we add them in below)
                 
                 if next_tag < 4: # 0 1 2 3
+                    '''
                     multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
                     distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[next_tag]
                     
@@ -179,8 +191,10 @@ class CRF(nn.Module):
                         if j != next_tag:
                             multiplier[j] = distributed_rate[k]
                             k += 1
-                            
-                    trans_score = self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*multiplier
+                    '''
+                    multiplier_row = (self.multiplier_softmax(self.multiplier-self.diagonal_neg_infinity_matrix))[next_tag]
+                    multiplier_row[next_tag] = -1
+                    trans_score = self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(device)])
                 else:
                     trans_score = self.transitions[next_tag]
                 
