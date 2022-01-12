@@ -51,9 +51,10 @@ class CRF(nn.Module):
         self.activate_fun = nn.Tanh()
         self.multiplier = nn.Parameter(torch.randn(self.tagset_size-2, self.tagset_size-2)) #4*4
         self.multiplier_softmax = nn.Softmax(dim=0)
-        self.diagonal_neg_infinity_matrix = torch.zeros(self.tagset_size-2, self.tagset_size-2) #4*4
+        #self.diagonal_neg_infinity_matrix = torch.zeros(self.tagset_size-2, self.tagset_size-2) #4*4
         for i in range(0, self.tagset_size-2, 1):
-            self.diagonal_neg_infinity_matrix[i][i] = -math.inf
+            #self.diagonal_neg_infinity_matrix[i][i] = -math.inf
+            self.multiplier.data[i][i] = -10000.
         
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -78,7 +79,9 @@ class CRF(nn.Module):
 
         # Wrap in a variable so that we will get automatic backprop
         forward_var = init_alphas
-
+        
+        multiplier_after_softmax = self.multiplier_softmax(self.multiplier)
+        
         # Iterate through the sentence
         for i, feat in enumerate(feats):
             alphas_t = []  # The forward tensors at this timestep
@@ -91,19 +94,9 @@ class CRF(nn.Module):
                 # next_tag from i
                 
                 if next_tag < 4: # 0 1 2 3
-                    '''
-                    multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
-                    distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[next_tag]
-                    
-                    k = 0 # index for distributed_rate, 0 1 2
-                    for j in range(0, self.tagset_size-2, 1):
-                        if j != next_tag:
-                            multiplier[j] = distributed_rate[k]
-                            k += 1
-                    '''
-                    multiplier_row = (self.multiplier_softmax(self.multiplier-self.diagonal_neg_infinity_matrix))[next_tag]
-                    multiplier_row[next_tag] = -1
-                    trans_score = ( self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(device)])*torch.cat([multiplier_row, torch.zeros(2).to(device)]) ).view(1, -1)
+                    multiplier_row = multiplier_after_softmax[next_tag]
+                    multiplier_row.data[next_tag] = -1
+                    trans_score = ( self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
                 else:
                     trans_score = self.transitions[next_tag].view(1, -1)
                 # The ith entry of next_tag_var is the value for the
@@ -140,20 +133,13 @@ class CRF(nn.Module):
         # Gives the score of a provided tag sequence
         score = torch.zeros(1).to(self.device)
         tags = torch.cat([torch.tensor([self.emo_to_ix[START_TAG]], dtype=torch.long), tags])
+        
+        multiplier_after_softmax = self.multiplier_softmax(self.multiplier)
+        
         for i, feat in enumerate(feats):
             if tags[i + 1] < 4 and tags[i] < 4: # both in 0, 1, 2, 3
-                '''
-                multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
-                distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[tags[i + 1]]
-                
-                k = 0 # index for distributed_rate, 0 1 2
-                for j in range(0, self.tagset_size-2, 1):
-                    if j != tags[i + 1]:
-                        multiplier[j] = distributed_rate[k]
-                        k += 1
-                '''
-                multiplier_row = (self.multiplier_softmax(self.multiplier-self.diagonal_neg_infinity_matrix))[tags[i + 1]]
-                multiplier_row[tags[i + 1]] = -1
+                multiplier_row = multiplier_after_softmax[tags[i + 1]]
+                multiplier_row.data[tags[i + 1]] = -1
                 trans_score = self.transitions[tags[i + 1], tags[i]] + self.bias_dict[dialog[i]]*(self.activate_fun(self.weight_for_emo_shift))[tags[i]]*multiplier_row[tags[i]]
                 
             else:
@@ -171,6 +157,9 @@ class CRF(nn.Module):
 
         # forward_var at step i holds the viterbi variables for step i-1
         forward_var = init_vvars
+        
+        multiplier_after_softmax = self.multiplier_softmax(self.multiplier)
+        
         for i, feat in enumerate(feats):
             bptrs_t = []  # holds the backpointers for this step
             viterbivars_t = []  # holds the viterbi variables for this step
@@ -182,19 +171,9 @@ class CRF(nn.Module):
                 # does not depend on them (we add them in below)
                 
                 if next_tag < 4: # 0 1 2 3
-                    '''
-                    multiplier = torch.ones(self.tagset_size).to(self.device) * -1.
-                    distributed_rate = (self.distribution_softmax(self.distribution_for_emo_shift))[next_tag]
-                    
-                    k = 0 # index for distributed_rate, 0 1 2
-                    for j in range(0, self.tagset_size-2, 1):
-                        if j != next_tag:
-                            multiplier[j] = distributed_rate[k]
-                            k += 1
-                    '''
-                    multiplier_row = (self.multiplier_softmax(self.multiplier-self.diagonal_neg_infinity_matrix))[next_tag]
-                    multiplier_row[next_tag] = -1
-                    trans_score = self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(device)])
+                    multiplier_row = multiplier_after_softmax[next_tag]
+                    multiplier_row.data[next_tag] = -1
+                    trans_score = self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
                 else:
                     trans_score = self.transitions[next_tag]
                 
@@ -241,7 +220,7 @@ class CRF(nn.Module):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
-    parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=1)
+    parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=5)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'constant')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
