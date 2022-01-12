@@ -59,12 +59,12 @@ def transition_bias(spk_dialogs, emo, val=None):
   """
   transit_num = 0
   total_transit = 0
-  count = 0
-  num = 0
   for dialog_id in spk_dialogs.values():
+    if len(dialog_id) == 0:
+      continue
     if val and val == dialog_id[0][:5]:
       continue
-
+    
     for entry in range(len(dialog_id) - 1):
       transit_num += (emo[dialog_id[entry]] != emo[dialog_id[entry + 1]])
     total_transit += (len(dialog_id) - 1)

@@ -32,7 +32,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
-    parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'constant')
+    parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'model')
     args = parser.parse_args()
     
     print(args)
@@ -58,10 +58,10 @@ if __name__ == "__main__":
         dias = dialogs
         
     if args.emo_shift == 'constant':
-        spk_dialogs = utils.split_dialog(dialogs)
+        spk_dialogs = utils.split_dialog(dias)
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/SVM_emo_shift_output.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
     
     test_data_Ses01 = []
     test_data_Ses02 = []

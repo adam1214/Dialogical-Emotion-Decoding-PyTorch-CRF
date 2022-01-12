@@ -96,7 +96,7 @@ class CRF(nn.Module):
                 if next_tag < 4: # 0 1 2 3
                     multiplier_row = multiplier_after_softmax[next_tag]
                     multiplier_row.data[next_tag] = -1
-                    trans_score = ( self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
+                    trans_score = ( self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun((self.bias_dict[dialog[i]]-0.5)*self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
                 else:
                     trans_score = self.transitions[next_tag].view(1, -1)
                 # The ith entry of next_tag_var is the value for the
@@ -140,7 +140,7 @@ class CRF(nn.Module):
             if tags[i + 1] < 4 and tags[i] < 4: # both in 0, 1, 2, 3
                 multiplier_row = multiplier_after_softmax[tags[i + 1]]
                 multiplier_row.data[tags[i + 1]] = -1
-                trans_score = self.transitions[tags[i + 1], tags[i]] + self.bias_dict[dialog[i]]*(self.activate_fun(self.weight_for_emo_shift))[tags[i]]*multiplier_row[tags[i]]
+                trans_score = self.transitions[tags[i + 1], tags[i]] + self.bias_dict[dialog[i]]*(self.activate_fun((self.bias_dict[dialog[i]]-0.5)*self.weight_for_emo_shift))[tags[i]]*multiplier_row[tags[i]]
                 
             else:
                 trans_score = self.transitions[tags[i + 1], tags[i]]
@@ -173,7 +173,7 @@ class CRF(nn.Module):
                 if next_tag < 4: # 0 1 2 3
                     multiplier_row = multiplier_after_softmax[next_tag]
                     multiplier_row.data[next_tag] = -1
-                    trans_score = self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun(self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
+                    trans_score = self.transitions[next_tag] + self.bias_dict[dialog[i]]*torch.cat([self.activate_fun((self.bias_dict[dialog[i]]-0.5)*self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
                 else:
                     trans_score = self.transitions[next_tag]
                 
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
     parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=5)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
-    parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'constant')
+    parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'model')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
     print(args)
@@ -245,10 +245,10 @@ if __name__ == "__main__":
         dias = dialogs
     
     if args.emo_shift == 'constant':
-        spk_dialogs = utils.split_dialog(dialogs)
+        spk_dialogs = utils.split_dialog(dias)
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/SVM_emo_shift_output.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
 
     # Make up training data & testing data
     model_num_val_map = {1:'5', 2:'4', 3:'2', 4:'1', 5: '3'}
