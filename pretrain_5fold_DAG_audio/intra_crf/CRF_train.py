@@ -163,7 +163,7 @@ class CRF(nn.Module):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
     parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=5)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
@@ -175,16 +175,15 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
-    dialogs = joblib.load('../data/dialog_iemocap.pkl')
-    dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
+    out_dict = joblib.load('../data/'+ args.pretrain_version + '/dag_outputs_4_all_fold_single_rearrange.pkl')
+    #dialogs = joblib.load('../data/dialog_iemocap.pkl')
+    #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
+    dialogs = joblib.load('../data/dialog_rearrange.pkl')
+    dialogs_edit = joblib.load('../data/dialog_rearrange_4emo_iemocap.pkl')
     
     if args.dataset == 'original':
         emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
-    elif args.dataset == 'C2C':
-        emo_dict = joblib.load('../data/C2C_4emo_all_iemocap.pkl')
-        dias = dialogs
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs

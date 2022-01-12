@@ -7,6 +7,7 @@ import numpy as np
 import argparse
 from argparse import RawTextHelpFormatter
 import utils
+from sklearn.metrics import confusion_matrix, recall_score, accuracy_score
 
 def argmax(vec):
     # return the argmax as a python int
@@ -161,7 +162,7 @@ class CRF(nn.Module):
         return score, tag_seq
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
+    parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     args = parser.parse_args()
 
@@ -169,16 +170,15 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
-    dialogs = joblib.load('../data/dialog_iemocap.pkl')
-    dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
+    out_dict = joblib.load('../data/'+ args.pretrain_version + '/dag_outputs_4_all_fold_single_rearrange.pkl')
+    #dialogs = joblib.load('../data/dialog_iemocap.pkl')
+    #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
+    dialogs = joblib.load('../data/dialog_rearrange.pkl')
+    dialogs_edit = joblib.load('../data/dialog_rearrange_4emo_iemocap.pkl')
     
     if args.dataset == 'original':
         emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
         dias = dialogs_edit
-    elif args.dataset == 'C2C':
-        emo_dict = joblib.load('../data/C2C_4emo_all_iemocap.pkl')
-        dias = dialogs
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
@@ -400,3 +400,18 @@ if __name__ == "__main__":
     f.close()
 
     joblib.dump(pred_dict, './model/' + args.pretrain_version + '/' + args.dataset + '/preds_4.pkl')
+    
+    # ensure pretrained model performance
+    labels = []
+    predicts = []
+    dialogs_edit = joblib.load('../data/dialog_rearrange_4emo_iemocap.pkl')
+    emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
+    emo2num = {'ang': 0, 'hap': 1, 'neu': 2, 'sad': 3}
+    
+    for dialog_name in dialogs_edit:
+        for utt in dialogs_edit[dialog_name]:
+            labels.append(emo2num[emo_dict[utt]])
+            predicts.append(out_dict[utt].argmax())
+          
+    print('pretrained UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
+    print('pretrained ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
