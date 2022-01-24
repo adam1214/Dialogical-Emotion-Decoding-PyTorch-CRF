@@ -10,6 +10,7 @@ import utils
 import matplotlib.pyplot as plt
 import pdb
 import math
+import os
 
 START_TAG = "<START>"
 STOP_TAG = "<STOP>"
@@ -226,6 +227,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
     print(args)
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0" 
     #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
     print(device)
@@ -248,7 +250,12 @@ if __name__ == "__main__":
         spk_dialogs = utils.split_dialog(dias)
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_variant_output.pkl')
+        for k in bias_dict:
+            if bias_dict[k] > 0.5:
+                bias_dict[k] = 1.0
+            else:
+                bias_dict[k] = 0.0
 
     # Make up training data & testing data
     model_num_val_map = {1:'5', 2:'4', 3:'2', 4:'1', 5: '3'}
@@ -413,7 +420,7 @@ if __name__ == "__main__":
     best_epoch = -1
     val_loss_list = []
     train_loss_list = []
-    for epoch in range(1, 60+1, 1):
+    for epoch in range(1, 70+1, 1):
         train_loss_sum = 0
         for dialog, emos in train_data:
             # Step 1. Remember that Pytorch accumulates gradients.

@@ -9,6 +9,7 @@ from argparse import RawTextHelpFormatter
 import utils
 from sklearn.metrics import confusion_matrix, recall_score, accuracy_score
 from CRF_train import CRF
+import os
 
 def argmax(vec):
     # return the argmax as a python int
@@ -36,6 +37,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     print(args)
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0" 
     #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
     print(device)
@@ -61,7 +63,12 @@ if __name__ == "__main__":
         spk_dialogs = utils.split_dialog(dias)
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_variant_output.pkl')
+        for k in bias_dict:
+            if bias_dict[k] > 0.5:
+                bias_dict[k] = 1.0
+            else:
+                bias_dict[k] = 0.0
     
     test_data_Ses01 = []
     test_data_Ses02 = []

@@ -62,7 +62,7 @@ if __name__ == "__main__":
         spk_dialogs = utils.split_dialog(dias)
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/RandomForest_emo_shift_output.pkl')
     
     test_data_Ses01 = []
     test_data_Ses02 = []
