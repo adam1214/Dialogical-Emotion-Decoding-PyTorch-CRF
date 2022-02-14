@@ -120,7 +120,7 @@ if __name__ == "__main__":
         for utt in bias_dict:
             bias_dict[utt] = 1.0
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_recall0.pkl')
         '''
         emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold1.pkl')
         emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold2.pkl')
