@@ -193,6 +193,18 @@ if __name__ == "__main__":
         val_dias = val_dialogs_edit
         test_emo_dict = joblib.load('../data/test_emo_all.pkl')
         test_dias = test_dialogs_edit
+    
+    emo_to_ix = {'anger':0, 'joy':1, 'neutral':2, 'sadness':3, START_TAG: 4, STOP_TAG: 5}
+    '''
+    for utt in train_out_dict:
+        if train_emo_dict[utt] in ['anger', 'joy', 'neutral', 'sadness']:
+            train_out_dict[utt] = np.zeros(4, dtype=np.float32)
+            train_out_dict[utt][emo_to_ix[train_emo_dict[utt]]] = 1.
+    for utt in val_out_dict:
+        if val_emo_dict[utt] in ['anger', 'joy', 'neutral', 'sadness']:
+            val_out_dict[utt] = np.zeros(4, dtype=np.float32)
+            val_out_dict[utt][emo_to_ix[val_emo_dict[utt]]] = 1.
+    '''
     '''
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo.pkl')
@@ -234,8 +246,6 @@ if __name__ == "__main__":
         val = utt_to_ix[key]
         ix_to_utt[val] = key
 
-    emo_to_ix = {'anger':0, 'joy':1, 'neutral':2, 'sadness':3, START_TAG: 4, STOP_TAG: 5}
-
     label_val = []
     for dia_emos_tuple in val_data:
         label_val += dia_emos_tuple[1]
@@ -252,13 +262,13 @@ if __name__ == "__main__":
             label_val[i] = -1
     
     model = CRF(len(utt_to_ix), emo_to_ix)
-    optimizer = optim.SGD(model.parameters(), lr=0.00001, weight_decay=0.1)
+    optimizer = optim.SGD(model.parameters(), lr=0.00001, weight_decay=0.001)
 
     max_uar_val = 0
     best_epoch = -1
     loss_list = []
     val_loss_list = []
-    for epoch in range(2):
+    for epoch in range(20):
         #random.shuffle(train_data)
         print('Epoch', epoch)
         for dialog, emos in train_data:

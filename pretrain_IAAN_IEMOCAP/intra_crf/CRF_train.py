@@ -38,7 +38,7 @@ class CRF(nn.Module):
 
         # Matrix of transition parameters.  Entry i,j is the score of
         # transitioning *to* i *from* j.
-        self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)*0.01) #6*6
+        self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -166,7 +166,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
     parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=5)
-    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'U2U')
+    parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
+    parser.add_argument("-t", "--train_source", type=str, help="which training source to use? label or pretrained model(model)?", default = 'label')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
     print(args)
@@ -178,8 +179,14 @@ if __name__ == "__main__":
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
-
-    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
+    
+    output_fold1 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold1.pkl')
+    output_fold2 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold2.pkl')
+    output_fold3 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold3.pkl')
+    output_fold4 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold4.pkl')
+    output_fold5 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold5.pkl')
+            
+    #out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
     #dialogs = joblib.load('../data/dialog_iemocap.pkl')
     #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     dialogs = joblib.load('../data/dialog_rearrange.pkl')
@@ -191,6 +198,25 @@ if __name__ == "__main__":
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
+    
+    emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
+    out_dict = {}
+    if args.train_source == 'model':
+        if args.model_num == '1':
+            out_dict = output_fold1
+        elif args.model_num == '2':
+            out_dict = output_fold2
+        elif args.model_num == '3':
+            out_dict = output_fold3
+        elif args.model_num == '4':
+            out_dict = output_fold4
+        else:
+            out_dict = output_fold5
+    else:
+        for utt in emo_dict:
+            if emo_dict[utt] in ['ang', 'hap', 'neu', 'sad']:
+                out_dict[utt] = np.zeros(4, dtype=np.float32)
+                out_dict[utt][emo_to_ix[emo_dict[utt]]] = 1.
         
     # Make up training data & testing data
     model_num_val_map = {1:'5', 2:'4', 3:'2', 4:'1', 5: '3'}
@@ -330,8 +356,6 @@ if __name__ == "__main__":
         val = utt_to_ix[key]
         ix_to_utt[val] = key
 
-    emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
-
     label_val = []
     for dia_emos_tuple in val_data:
         label_val += dia_emos_tuple[1]
@@ -349,13 +373,13 @@ if __name__ == "__main__":
     
     model = CRF(len(utt_to_ix), emo_to_ix)
     model.to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-2, momentum=0.5)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-2, momentum=0.5)
 
     max_uar_val = 0
     best_epoch = -1
     loss_list = []
     val_loss_list = []
-    for epoch in range(30):
+    for epoch in range(10):
         print('Epoch', epoch)
         for dialog, emos in train_data:
             # Step 1. Remember that Pytorch accumulates gradients.

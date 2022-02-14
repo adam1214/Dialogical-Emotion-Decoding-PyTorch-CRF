@@ -35,7 +35,7 @@ def log_sum_exp(vec):
         
 class CRF(nn.Module):
 
-    def __init__(self, vocab_size, emo_to_ix, out_dict, bias_dict, ix_to_utt, device):
+    def __init__(self, vocab_size, emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin):
         super(CRF, self).__init__()
         self.vocab_size = vocab_size
         self.emo_to_ix = emo_to_ix
@@ -44,11 +44,15 @@ class CRF(nn.Module):
         self.bias_dict = bias_dict
         self.ix_to_utt = ix_to_utt
         self.device = device
+        self.margin = margin
         
         # Matrix of transition parameters.  Entry i,j is the score of
         # transitioning *to* i *from* j.
         self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
-        self.weight_for_emo_shift = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
+        #self.weight_for_emo_with_shift_in_activate = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
+        self.weight_for_emo_shift_in_activate = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
+        self.weight_for_emo_with_shift_out_activate = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
+        self.weight_for_emo_no_shift_out_activate = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
         self.activate_fun = nn.Tanh()
         self.multiplier = nn.Parameter(torch.randn(self.tagset_size-2, self.tagset_size-2)) #4*4
         self.multiplier_softmax = nn.Softmax(dim=0)
@@ -71,7 +75,7 @@ class CRF(nn.Module):
         5	0.015747981	   -0.006298472	    0.02406978	    0.0027856624	0.0024675291	-10000.0
         (end point)
         '''
-        
+
     def _forward_alg(self, feats, dialog):
         # Do the forward algorithm to compute the partition function
         init_alphas = torch.full((1, self.tagset_size), -10000.).to(self.device)
@@ -97,7 +101,10 @@ class CRF(nn.Module):
                 if next_tag < 4: # 0 1 2 3
                     multiplier_row = multiplier_after_softmax[next_tag]
                     multiplier_row.data[next_tag] = -1
-                    trans_score = ( self.transitions[next_tag] + torch.cat([self.activate_fun((self.bias_dict[dialog[i]]-0.5)*self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
+                    if self.bias_dict[dialog[i]] > 0.5:
+                        trans_score = ( self.transitions[next_tag] + torch.cat([self.weight_for_emo_with_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
+                    else:
+                        trans_score = ( self.transitions[next_tag] + torch.cat([self.weight_for_emo_no_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
                 else:
                     trans_score = self.transitions[next_tag].view(1, -1)
                 # The ith entry of next_tag_var is the value for the
@@ -126,7 +133,6 @@ class CRF(nn.Module):
                 output_vals[i][5] = 3.0
             else:
                 output_vals[i][5] = -3.0
-            
         pretrain_model_feats = torch.from_numpy(output_vals)
         return pretrain_model_feats.to(self.device) # tensor: (utt數量) * (情緒數量+2)
 
@@ -141,8 +147,10 @@ class CRF(nn.Module):
             if tags[i + 1] < 4 and tags[i] < 4: # both in 0, 1, 2, 3
                 multiplier_row = multiplier_after_softmax[tags[i + 1]]
                 multiplier_row.data[tags[i + 1]] = -1
-                trans_score = self.transitions[tags[i + 1], tags[i]] + (self.activate_fun((self.bias_dict[dialog[i]]-0.5)*self.weight_for_emo_shift))[tags[i]]*multiplier_row[tags[i]]
-                
+                if self.bias_dict[dialog[i]] > 0.5:
+                    trans_score = self.transitions[tags[i + 1], tags[i]] + (self.weight_for_emo_with_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate))[tags[i]]*multiplier_row[tags[i]]
+                else:
+                    trans_score = self.transitions[tags[i + 1], tags[i]] + (self.weight_for_emo_no_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate))[tags[i]]*multiplier_row[tags[i]]
             else:
                 trans_score = self.transitions[tags[i + 1], tags[i]]
             score = score + trans_score + feat[tags[i + 1]]
@@ -174,7 +182,10 @@ class CRF(nn.Module):
                 if next_tag < 4: # 0 1 2 3
                     multiplier_row = multiplier_after_softmax[next_tag]
                     multiplier_row.data[next_tag] = -1
-                    trans_score = self.transitions[next_tag] + torch.cat([self.activate_fun((self.bias_dict[dialog[i]]-0.5)*self.weight_for_emo_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
+                    if self.bias_dict[dialog[i]] > 0.5:
+                        trans_score = self.transitions[next_tag] + torch.cat([self.weight_for_emo_with_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
+                    else:
+                        trans_score = self.transitions[next_tag] + torch.cat([self.weight_for_emo_no_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
                 else:
                     trans_score = self.transitions[next_tag]
                 
@@ -224,6 +235,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--model_num", type=int, help="which model number you want to train?", default=5)
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'model')
+    parser.add_argument("-t", "--train_source", type=str, help="which training source to use? label or pretrained model(model)?", default = 'label')
     parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
     args = parser.parse_args()
     print(args)
@@ -233,7 +245,13 @@ if __name__ == "__main__":
     print(device)
     torch.manual_seed(args.seed)
 
-    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
+    output_fold1 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold1.pkl')
+    output_fold2 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold2.pkl')
+    output_fold3 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold3.pkl')
+    output_fold4 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold4.pkl')
+    output_fold5 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold5.pkl')
+        
+    #out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
     #dialogs = joblib.load('../data/dialog_iemocap.pkl')
     #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     dialogs = joblib.load('../data/dialog_rearrange.pkl')
@@ -245,17 +263,60 @@ if __name__ == "__main__":
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
+        
+    emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
+    out_dict = {}
+    if args.train_source == 'model':
+        if args.model_num == '1':
+            out_dict = output_fold1
+        elif args.model_num == '2':
+            out_dict = output_fold2
+        elif args.model_num == '3':
+            out_dict = output_fold3
+        elif args.model_num == '4':
+            out_dict = output_fold4
+        else:
+            out_dict = output_fold5
+    else:
+        for utt in emo_dict:
+            if emo_dict[utt] in ['ang', 'hap', 'neu', 'sad']:
+                out_dict[utt] = np.zeros(4, dtype=np.float32)
+                out_dict[utt][emo_to_ix[emo_dict[utt]]] = 1.
     
     if args.emo_shift == 'constant':
         spk_dialogs = utils.split_dialog(dias)
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
     else:
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
+        # replace with margin
+        '''
+        for utt in bias_dict:
+            if 'Ses0' in utt:
+                if bias_dict[utt] == 1.0:
+                    bias_dict[utt] = 1.2
+                else:
+                    bias_dict[utt] = -0.2
+        '''
+        '''
+        if args.model_num == 1:
+            bias_dict = joblib.load('../data/'+ args.pretrain_version + '/NB_emo_shift_output_fold1.pkl')
+        elif args.model_num == 2:
+            bias_dict = joblib.load('../data/'+ args.pretrain_version + '/NB_emo_shift_output_fold2.pkl')
+        elif args.model_num == 3:
+            bias_dict = joblib.load('../data/'+ args.pretrain_version + '/NB_emo_shift_output_fold3.pkl')
+        elif args.model_num == 4:
+            bias_dict = joblib.load('../data/'+ args.pretrain_version + '/NB_emo_shift_output_fold4.pkl')
+        else:
+            bias_dict = joblib.load('../data/'+ args.pretrain_version + '/NB_emo_shift_output_fold5.pkl')
+        '''
+        '''
         bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_variant_output.pkl')
         for k in bias_dict:
             if bias_dict[k] > 0.5:
                 bias_dict[k] = 1.0
             else:
                 bias_dict[k] = 0.0
+        '''
 
     # Make up training data & testing data
     model_num_val_map = {1:'5', 2:'4', 3:'2', 4:'1', 5: '3'}
@@ -395,8 +456,6 @@ if __name__ == "__main__":
         val = utt_to_ix[key]
         ix_to_utt[val] = key
 
-    emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
-
     label_val = []
     for dia_emos_tuple in val_data:
         label_val += dia_emos_tuple[1]
@@ -412,7 +471,7 @@ if __name__ == "__main__":
         else:
             label_val[i] = -1
     
-    model = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
+    model = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.2)
     model.to(device)
     optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-2, momentum=0.5)
 

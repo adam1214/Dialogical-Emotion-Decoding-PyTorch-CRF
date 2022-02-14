@@ -261,7 +261,7 @@ if __name__ == "__main__":
     
     model = CRF(len(utt_to_ix), emo_to_ix)
     model.to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.00001, weight_decay=0.01)
+    optimizer = optim.SGD(model.parameters(), lr=0.00001, weight_decay=0.001)
 
     max_uar_val = 0
     best_epoch = -1

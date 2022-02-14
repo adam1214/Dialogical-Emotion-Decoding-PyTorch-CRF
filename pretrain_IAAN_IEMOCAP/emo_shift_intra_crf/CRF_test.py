@@ -7,9 +7,11 @@ import numpy as np
 import argparse
 from argparse import RawTextHelpFormatter
 import utils
-from sklearn.metrics import confusion_matrix, recall_score, accuracy_score
+from sklearn.metrics import confusion_matrix, recall_score, accuracy_score, precision_score
 from CRF_train import CRF
 import os
+import pdb
+import pandas as pd
 
 def argmax(vec):
     # return the argmax as a python int
@@ -28,7 +30,40 @@ def log_sum_exp(vec):
     max_score_broadcast = max_score.view(1, -1).expand(1, vec.size()[1])
     return max_score + \
         torch.log(torch.sum(torch.exp(vec - max_score_broadcast)))
-    
+
+def view_new_matrix(model):
+    with torch.no_grad():
+        multiplier_after_softmax = model.multiplier_softmax(model.multiplier)
+        for i in range(0,4,1):
+            multiplier_after_softmax[i][i] = -1.
+        multiplier_after_softmax_6_6 = torch.zeros([6,6])
+        for i in range(0,4,1):
+            for j in range(0,4,1):
+                multiplier_after_softmax_6_6[i][j] = multiplier_after_softmax[i][j]
+                
+        weight_for_emo_shift_in_activate = torch.cat([model.weight_for_emo_shift_in_activate.expand(1, 4), torch.zeros(1,2)], dim=1) #(1,6)
+        weight_for_emo_with_shift_out_activate = torch.cat([model.weight_for_emo_with_shift_out_activate.expand(1, 4), torch.zeros(1,2)], dim=1)
+        weight_for_emo_no_shift_out_activate = torch.cat([model.weight_for_emo_no_shift_out_activate.expand(1, 4), torch.zeros(1,2)], dim=1)
+        
+        weight_for_emo_shift_in_activate = torch.cat([weight_for_emo_shift_in_activate, weight_for_emo_shift_in_activate, weight_for_emo_shift_in_activate, weight_for_emo_shift_in_activate, torch.zeros(1,6), torch.zeros(1,6)], dim=0)
+        weight_for_emo_with_shift_out_activate = torch.cat([weight_for_emo_with_shift_out_activate, weight_for_emo_with_shift_out_activate, weight_for_emo_with_shift_out_activate, weight_for_emo_with_shift_out_activate, torch.zeros(1,6), torch.zeros(1,6)], dim=0)
+        weight_for_emo_no_shift_out_activate = torch.cat([weight_for_emo_no_shift_out_activate, weight_for_emo_no_shift_out_activate, weight_for_emo_no_shift_out_activate, weight_for_emo_no_shift_out_activate, torch.zeros(1,6), torch.zeros(1,6)], dim=0)
+        
+        new_matrix_case1 = model.transitions + weight_for_emo_no_shift_out_activate*model.activate_fun((0-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
+        print('#####OLD:')
+        print(pd.DataFrame((np.array(model.transitions))).round(2))
+        print('#####CASE1: NO SHIFT')
+        print(pd.DataFrame((np.array(new_matrix_case1.data))).round(2))
+        new_matrix_case2 = model.transitions + weight_for_emo_with_shift_out_activate*model.activate_fun((1-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
+        print('#####CASE2: WITH SHIFT')
+        print(pd.DataFrame(np.array(new_matrix_case2.data)).round(2))
+        print('#####TERM_1 (How much to subtract/add in CASE1)')
+        print(pd.DataFrame(np.array(weight_for_emo_no_shift_out_activate*model.activate_fun((0-0.5)*weight_for_emo_shift_in_activate).data).round(2)))
+        print('#####TERM_1 (How much to subtract/add in CASE2)')
+        print(pd.DataFrame(np.array(weight_for_emo_with_shift_out_activate*model.activate_fun((1-0.5)*weight_for_emo_shift_in_activate).data).round(2)))
+        print('#####multiplier_after_softmax (Diagonal value (-1) is constant)')
+        print(pd.DataFrame(np.array(multiplier_after_softmax_6_6)).round(2))
+        
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
@@ -46,7 +81,26 @@ if __name__ == "__main__":
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
 
-    out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
+    output_fold1 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold1.pkl')
+    output_fold2 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold2.pkl')
+    output_fold3 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold3.pkl')
+    output_fold4 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold4.pkl')
+    output_fold5 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold5.pkl')
+    
+    out_dict = {}
+    for utt in output_fold1:
+        if utt[4] == '1':
+            out_dict[utt] = output_fold1[utt]
+        elif utt[4] == '2':
+            out_dict[utt] = output_fold2[utt]
+        elif utt[4] == '3':
+            out_dict[utt] = output_fold3[utt]
+        elif utt[4] == '4':
+            out_dict[utt] = output_fold4[utt]
+        elif utt[4] == '5':
+            out_dict[utt] = output_fold5[utt]
+            
+    #out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
     #dialogs = joblib.load('../data/dialog_iemocap.pkl')
     #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     dialogs = joblib.load('../data/dialog_rearrange.pkl')
@@ -58,17 +112,56 @@ if __name__ == "__main__":
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all_iemocap.pkl')
         dias = dialogs
-        
+    
+    bias_dict_label = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
     if args.emo_shift == 'constant':
         spk_dialogs = utils.split_dialog(dias)
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
+        for utt in bias_dict:
+            bias_dict[utt] = 1.0
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_variant_output.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output.pkl')
+        '''
+        emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold1.pkl')
+        emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold2.pkl')
+        emo_prob_fold3 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold3.pkl')
+        emo_prob_fold4 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold4.pkl')
+        emo_prob_fold5 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold5.pkl')
+        bias_dict = {}
+        for utt in emo_prob_fold1:
+            if utt[4] == '1':
+                bias_dict[utt] = emo_prob_fold1[utt]
+            elif utt[4] == '2':
+                bias_dict[utt] = emo_prob_fold2[utt]
+            elif utt[4] == '3':
+                bias_dict[utt] = emo_prob_fold3[utt]
+            elif utt[4] == '4':
+                bias_dict[utt] = emo_prob_fold4[utt]
+            elif utt[4] == '5':
+                bias_dict[utt] = emo_prob_fold5[utt]
+        '''
+        '''
         for k in bias_dict:
             if bias_dict[k] > 0.5:
                 bias_dict[k] = 1.0
             else:
                 bias_dict[k] = 0.0
+        '''
+    p, g = [], []
+    for utt in bias_dict_label:
+        if 'Ses0' in utt:
+            if bias_dict[utt] > 0.5:
+                p.append(1)
+            else:
+                p.append(0)
+            g.append(int(bias_dict_label[utt]))
+    print('## EMO_SHIFT MODEL PERFORMANCE ##')
+    print(len(p), len(g))
+    print('UAR:', round(recall_score(g, p, average='macro')*100, 2), '%')
+    print('UAR 2 type:', recall_score(g, p, average=None))
+    print('precision 2 type:', precision_score(g, p, average=None))
+    print(confusion_matrix(g, p))
+    print('##########')
     
     test_data_Ses01 = []
     test_data_Ses02 = []
@@ -177,31 +270,31 @@ if __name__ == "__main__":
     emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
 
     # Load model
-    model_1 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
+    model_1 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
     model_1.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
 
-    model_2 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
+    model_2 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
     model_2.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
 
-    model_3 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
+    model_3 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
     model_3.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
 
-    model_4 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
+    model_4 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
     model_4.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
 
-    model_5 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
+    model_5 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
     model_5.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])
@@ -307,3 +400,16 @@ if __name__ == "__main__":
             
     print('pretrained UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
     print('pretrained ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
+    '''
+    #analysis: new matrix(case1: emo_shift prob.=0 & case2:emo_shift prob.=1)
+    print('##########MODEL_1##########')
+    view_new_matrix(model_1)
+    print('##########MODEL_2##########')
+    view_new_matrix(model_2)
+    print('##########MODEL_3##########')
+    view_new_matrix(model_3)
+    print('##########MODEL_4##########')
+    view_new_matrix(model_4)
+    print('##########MODEL_5##########')
+    view_new_matrix(model_5)
+    '''
