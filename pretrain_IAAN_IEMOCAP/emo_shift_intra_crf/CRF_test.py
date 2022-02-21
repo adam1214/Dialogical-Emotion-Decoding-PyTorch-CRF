@@ -120,7 +120,8 @@ if __name__ == "__main__":
         for utt in bias_dict:
             bias_dict[utt] = 1.0
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_recall0.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_precision1.pkl')
+        #bias_dict = bias_dict_label
         '''
         emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold1.pkl')
         emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold2.pkl')
@@ -158,7 +159,7 @@ if __name__ == "__main__":
     print('## EMO_SHIFT MODEL PERFORMANCE ##')
     print(len(p), len(g))
     print('UAR:', round(recall_score(g, p, average='macro')*100, 2), '%')
-    print('UAR 2 type:', recall_score(g, p, average=None))
+    print('RECALL 2 type:', recall_score(g, p, average=None))
     print('precision 2 type:', precision_score(g, p, average=None))
     print(confusion_matrix(g, p))
     print('##########')

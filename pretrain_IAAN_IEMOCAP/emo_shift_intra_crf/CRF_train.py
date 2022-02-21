@@ -289,14 +289,14 @@ if __name__ == "__main__":
     else:
         bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
         # replace with margin
-        '''
+        
         for utt in bias_dict:
             if 'Ses0' in utt:
                 if bias_dict[utt] == 1.0:
                     bias_dict[utt] = 1.2
                 else:
                     bias_dict[utt] = -0.2
-        '''
+        
         '''
         if args.model_num == 1:
             bias_dict = joblib.load('../data/'+ args.pretrain_version + '/NB_emo_shift_output_fold1.pkl')
@@ -471,7 +471,7 @@ if __name__ == "__main__":
         else:
             label_val[i] = -1
     
-    model = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.2)
+    model = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
     model.to(device)
     optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-2, momentum=0.5)
 
