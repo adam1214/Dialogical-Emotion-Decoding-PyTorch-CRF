@@ -35,7 +35,7 @@ def log_sum_exp(vec):
         
 class CRF(nn.Module):
 
-    def __init__(self, vocab_size, emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin):
+    def __init__(self, vocab_size, emo_to_ix, out_dict, bias_dict, ix_to_utt, device):
         super(CRF, self).__init__()
         self.vocab_size = vocab_size
         self.emo_to_ix = emo_to_ix
@@ -44,13 +44,15 @@ class CRF(nn.Module):
         self.bias_dict = bias_dict
         self.ix_to_utt = ix_to_utt
         self.device = device
-        self.margin = margin
         
         # Matrix of transition parameters.  Entry i,j is the score of
         # transitioning *to* i *from* j.
         self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size)) #6*6
         #self.weight_for_emo_with_shift_in_activate = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
         self.weight_for_emo_shift_in_activate = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
+        self.bias_in_activate_no_shift = nn.Parameter(torch.randn(1)) #[1]
+        self.bias_in_activate_with_shift = nn.Parameter(torch.randn(1)) #[1]
+        
         self.weight_for_emo_with_shift_out_activate = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
         self.weight_for_emo_no_shift_out_activate = nn.Parameter(torch.randn(self.tagset_size-2)) #[4]
         self.activate_fun = nn.Tanh()
@@ -102,9 +104,9 @@ class CRF(nn.Module):
                     multiplier_row = multiplier_after_softmax[next_tag]
                     multiplier_row.data[next_tag] = -1
                     if self.bias_dict[dialog[i]] > 0.5:
-                        trans_score = ( self.transitions[next_tag] + torch.cat([self.weight_for_emo_with_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
+                        trans_score = ( self.transitions[next_tag] + torch.cat([self.weight_for_emo_with_shift_out_activate*self.activate_fun(self.bias_dict[dialog[i]]*self.weight_for_emo_shift_in_activate+self.bias_in_activate_with_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
                     else:
-                        trans_score = ( self.transitions[next_tag] + torch.cat([self.weight_for_emo_no_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
+                        trans_score = ( self.transitions[next_tag] + torch.cat([self.weight_for_emo_no_shift_out_activate*self.activate_fun(self.bias_dict[dialog[i]]*self.weight_for_emo_shift_in_activate+self.bias_in_activate_no_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)]) ).view(1, -1)
                 else:
                     trans_score = self.transitions[next_tag].view(1, -1)
                 # The ith entry of next_tag_var is the value for the
@@ -148,9 +150,9 @@ class CRF(nn.Module):
                 multiplier_row = multiplier_after_softmax[tags[i + 1]]
                 multiplier_row.data[tags[i + 1]] = -1
                 if self.bias_dict[dialog[i]] > 0.5:
-                    trans_score = self.transitions[tags[i + 1], tags[i]] + (self.weight_for_emo_with_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate))[tags[i]]*multiplier_row[tags[i]]
+                    trans_score = self.transitions[tags[i + 1], tags[i]] + (self.weight_for_emo_with_shift_out_activate*self.activate_fun(self.bias_dict[dialog[i]]*self.weight_for_emo_shift_in_activate+self.bias_in_activate_with_shift))[tags[i]]*multiplier_row[tags[i]]
                 else:
-                    trans_score = self.transitions[tags[i + 1], tags[i]] + (self.weight_for_emo_no_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate))[tags[i]]*multiplier_row[tags[i]]
+                    trans_score = self.transitions[tags[i + 1], tags[i]] + (self.weight_for_emo_no_shift_out_activate*self.activate_fun(self.bias_dict[dialog[i]]*self.weight_for_emo_shift_in_activate+self.bias_in_activate_no_shift))[tags[i]]*multiplier_row[tags[i]]
             else:
                 trans_score = self.transitions[tags[i + 1], tags[i]]
             score = score + trans_score + feat[tags[i + 1]]
@@ -183,9 +185,9 @@ class CRF(nn.Module):
                     multiplier_row = multiplier_after_softmax[next_tag]
                     multiplier_row.data[next_tag] = -1
                     if self.bias_dict[dialog[i]] > 0.5:
-                        trans_score = self.transitions[next_tag] + torch.cat([self.weight_for_emo_with_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
+                        trans_score = self.transitions[next_tag] + torch.cat([self.weight_for_emo_with_shift_out_activate*self.activate_fun(self.bias_dict[dialog[i]]*self.weight_for_emo_shift_in_activate+self.bias_in_activate_with_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
                     else:
-                        trans_score = self.transitions[next_tag] + torch.cat([self.weight_for_emo_no_shift_out_activate*self.activate_fun((self.bias_dict[dialog[i]]-0.5+self.margin)*self.weight_for_emo_shift_in_activate), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
+                        trans_score = self.transitions[next_tag] + torch.cat([self.weight_for_emo_no_shift_out_activate*self.activate_fun(self.bias_dict[dialog[i]]*self.weight_for_emo_shift_in_activate+self.bias_in_activate_no_shift), torch.zeros(2).to(self.device)])*torch.cat([multiplier_row, torch.zeros(2).to(self.device)])
                 else:
                     trans_score = self.transitions[next_tag]
                 
@@ -289,14 +291,31 @@ if __name__ == "__main__":
     else:
         bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all_rearrange.pkl')
         # replace with margin
-        
+        '''
         for utt in bias_dict:
             if 'Ses0' in utt:
                 if bias_dict[utt] == 1.0:
                     bias_dict[utt] = 1.2
                 else:
                     bias_dict[utt] = -0.2
-        
+        '''
+        '''
+        emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold1.pkl')
+        emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold2.pkl')
+        emo_prob_fold3 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold3.pkl')
+        emo_prob_fold4 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold4.pkl')
+        emo_prob_fold5 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold5.pkl')
+        if args.model_num == 1:
+            bias_dict = emo_prob_fold1
+        elif args.model_num == 2:
+            bias_dict = emo_prob_fold2
+        elif args.model_num == 3:
+            bias_dict = emo_prob_fold3
+        elif args.model_num == 4:
+            bias_dict = emo_prob_fold4
+        else:
+            bias_dict = emo_prob_fold5
+        '''
         '''
         if args.model_num == 1:
             bias_dict = joblib.load('../data/'+ args.pretrain_version + '/NB_emo_shift_output_fold1.pkl')
@@ -471,9 +490,9 @@ if __name__ == "__main__":
         else:
             label_val[i] = -1
     
-    model = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model.to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-2, momentum=0.5)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=0.05, momentum=0.5)
 
     max_uar_val = 0
     best_epoch = -1

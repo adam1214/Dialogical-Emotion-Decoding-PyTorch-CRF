@@ -120,9 +120,9 @@ if __name__ == "__main__":
         for utt in bias_dict:
             bias_dict[utt] = 1.0
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output.pkl')
+        #bias_dict = joblib.load('../data/'+ args.pretrain_version + '/LogisticRegression_emo_shift_output.pkl')
         #bias_dict = bias_dict_label
-        '''
+        
         emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold1.pkl')
         emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold2.pkl')
         emo_prob_fold3 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold3.pkl')
@@ -140,7 +140,7 @@ if __name__ == "__main__":
                 bias_dict[utt] = emo_prob_fold4[utt]
             elif utt[4] == '5':
                 bias_dict[utt] = emo_prob_fold5[utt]
-        '''
+        
         '''
         for k in bias_dict:
             if bias_dict[k] > 0.5:
@@ -149,13 +149,24 @@ if __name__ == "__main__":
                 bias_dict[k] = 0.0
         '''
     p, g = [], []
+    emo_shift_list, emo_no_shift_list, all_list = [], [], []
     for utt in bias_dict_label:
         if 'Ses0' in utt:
+            all_list.append(bias_dict[utt])
             if bias_dict[utt] > 0.5:
                 p.append(1)
+                #emo_shift_list.append(bias_dict[utt])
             else:
                 p.append(0)
+                #emo_no_shift_list.append(bias_dict[utt])
             g.append(int(bias_dict_label[utt]))
+            if int(bias_dict_label[utt]) == 1:
+                emo_shift_list.append(bias_dict[utt])
+            else:
+                emo_no_shift_list.append(bias_dict[utt])
+    print('AVG of emo_shift prob.:', round(np.mean(np.array(emo_shift_list)), 2), '+-', round(np.std(np.array(emo_shift_list), ddof=0), 2))
+    print('AVG of emo_no_shift prob.:', round(np.mean(np.array(emo_no_shift_list)), 3), '+-', round(np.std(np.array(emo_no_shift_list), ddof=0), 3))
+    print('AVG of all prob.:', round(np.mean(np.array(all_list)), 3), '+-', round(np.std(np.array(all_list), ddof=0), 3))
     print('## EMO_SHIFT MODEL PERFORMANCE ##')
     print(len(p), len(g))
     print('UAR:', round(recall_score(g, p, average='macro')*100, 2), '%')
@@ -271,31 +282,31 @@ if __name__ == "__main__":
     emo_to_ix = {'Anger':0, 'Happiness':1, 'Neutral':2, 'Sadness':3, START_TAG: 4, STOP_TAG: 5}
 
     # Load model
-    model_1 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_1 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_1.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
 
-    model_2 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_2 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_2.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
 
-    model_3 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_3 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_3.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
 
-    model_4 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_4 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_4.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
 
-    model_5 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_5 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_5.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])

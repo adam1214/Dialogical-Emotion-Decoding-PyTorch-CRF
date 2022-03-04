@@ -137,7 +137,7 @@ if __name__ == '__main__':
     display_count = 0
     for i in range(0, len(key_sorting_list), 1):
         if key_sorting_list[i][0] != key_sorting_list[i][2]:
-            print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]], '%')
+            print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]], '%', '/', len(rescoring_case_list_dict[key_sorting_list[i][0:3]+'_emo_list']))
             display_count += 1
         if display_count == 5:
             break

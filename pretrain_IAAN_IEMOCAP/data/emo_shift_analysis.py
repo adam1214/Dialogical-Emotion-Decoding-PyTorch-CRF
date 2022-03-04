@@ -44,7 +44,6 @@ if __name__ == '__main__':
     for dialog_id in spk_dialogs.values():
       if len(dialog_id) == 0:
         continue
-      
       for entry in range(len(dialog_id) - 1):
         if emo_dict[dialog_id[entry]] != emo_dict[dialog_id[entry + 1]]:
           transit_num += 1
@@ -78,3 +77,65 @@ if __name__ == '__main__':
     print('the other emotion to h:', round(other_2_h/(other_2_a+other_2_h+other_2_n+other_2_s)*100, 2), '%')
     print('the other emotion to n:', round(other_2_n/(other_2_a+other_2_h+other_2_n+other_2_s)*100, 2), '%')
     print('the other emotion to s:', round(other_2_s/(other_2_a+other_2_h+other_2_n+other_2_s)*100, 2), '%')
+    
+    a_shift = 0
+    a_no_shift = 0
+    h_shift = 0
+    h_no_shift = 0
+    n_shift = 0
+    n_no_shift = 0
+    s_shift = 0
+    s_no_shift = 0
+    
+    emo_shift_cnt_dict = {}
+    
+    for dialog_id in spk_dialogs.values():
+      if len(dialog_id) == 0:
+          continue
+      for entry in range(len(dialog_id) - 1):
+          if emo_dict[dialog_id[entry]] == 'ang' and emo_dict[dialog_id[entry+1]] == 'ang':
+              a_no_shift += 1
+          elif emo_dict[dialog_id[entry]] == 'ang' and emo_dict[dialog_id[entry+1]] != 'ang':
+              a_shift += 1
+              if emo_shift_cnt_dict.get(emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]) == None:
+                  emo_shift_cnt_dict[emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]] = 0
+              emo_shift_cnt_dict[emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]] += 1
+              
+          if emo_dict[dialog_id[entry]] == 'hap' and emo_dict[dialog_id[entry+1]] == 'hap':
+              h_no_shift += 1
+          elif emo_dict[dialog_id[entry]] == 'hap' and emo_dict[dialog_id[entry+1]] != 'hap':
+              h_shift += 1
+              if emo_shift_cnt_dict.get(emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]) == None:
+                  emo_shift_cnt_dict[emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]] = 0
+              emo_shift_cnt_dict[emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]] += 1
+              
+          if emo_dict[dialog_id[entry]] == 'neu' and emo_dict[dialog_id[entry+1]] == 'neu':
+              n_no_shift += 1
+          elif emo_dict[dialog_id[entry]] == 'neu' and emo_dict[dialog_id[entry+1]] != 'neu':
+              n_shift += 1
+              if emo_shift_cnt_dict.get(emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]) == None:
+                  emo_shift_cnt_dict[emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]] = 0
+              emo_shift_cnt_dict[emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]] += 1
+              
+          if emo_dict[dialog_id[entry]] == 'sad' and emo_dict[dialog_id[entry+1]] == 'sad':
+              s_no_shift += 1
+          elif emo_dict[dialog_id[entry]] == 'sad' and emo_dict[dialog_id[entry+1]] != 'sad':
+              s_shift += 1
+              if emo_shift_cnt_dict.get(emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]) == None:
+                  emo_shift_cnt_dict[emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]] = 0
+              emo_shift_cnt_dict[emo_dict[dialog_id[entry]][0] + '2' + emo_dict[dialog_id[entry+1]][0]] += 1
+    print('#####')
+    print('shift from ang:', round(a_shift/(a_no_shift+a_shift)*100, 2), '%')
+    print('shift from hap:', round(h_shift/(h_no_shift+h_shift)*100, 2), '%')
+    print('shift from neu:', round(n_shift/(n_no_shift+n_shift)*100, 2), '%')
+    print('shift from sad:', round(s_shift/(s_no_shift+s_shift)*100, 2), '%')
+    print('#####')
+    
+    for key_trans_1 in emo_shift_cnt_dict:
+        first_emo = key_trans_1[0]
+        second_emo = key_trans_1[1]
+        first_2_total_cnt = 0
+        for key_trans_2 in emo_shift_cnt_dict:
+            if key_trans_2[0] == first_emo:
+                first_2_total_cnt  += emo_shift_cnt_dict[key_trans_2]
+        print(key_trans_1, round(emo_shift_cnt_dict[key_trans_1]/first_2_total_cnt, 2))

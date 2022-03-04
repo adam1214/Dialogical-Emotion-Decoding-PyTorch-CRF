@@ -12,6 +12,8 @@ from CRF_train import CRF
 import os
 import pdb
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 def argmax(vec):
     # return the argmax as a python int
@@ -51,19 +53,42 @@ def view_new_matrix(model):
         
         new_matrix_case1 = model.transitions + weight_for_emo_no_shift_out_activate*model.activate_fun((0-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
         print('#####OLD:')
-        print(pd.DataFrame((np.array(model.transitions))).round(2))
+        print(pd.DataFrame((np.array(model.transitions)[:4,:4])).round(2))
         print('#####CASE1: NO SHIFT')
-        print(pd.DataFrame((np.array(new_matrix_case1.data))).round(2))
+        print(pd.DataFrame((np.array(new_matrix_case1.data)[:4,:4])).round(2))
         new_matrix_case2 = model.transitions + weight_for_emo_with_shift_out_activate*model.activate_fun((1-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
         print('#####CASE2: WITH SHIFT')
-        print(pd.DataFrame(np.array(new_matrix_case2.data)).round(2))
+        print(pd.DataFrame(np.array(new_matrix_case2.data)[:4,:4]).round(2))
+        
+        fig, axs = plt.subplots(ncols=3, gridspec_kw=dict(width_ratios=[1,1,1.2]))
+        #sns.set(rc={'figure.figsize':(40,8)})
+        global_max = -100
+        global_min = 100
+        for matrix in [np.array(model.transitions)[:4,:4], np.array(new_matrix_case1.data)[:4,:4], np.array(new_matrix_case2.data)[:4,:4]]:
+            local_min = matrix.min()
+            local_max = matrix.max()
+            if global_max < local_max:
+                global_max = local_max
+            if global_min > local_min:
+                global_min = local_min
+        sns.heatmap(np.array(model.transitions)[:4,:4], annot=True, fmt='.2g', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], ax=axs[0], cbar=False, vmin=global_min, vmax=global_max)
+        sns.heatmap(np.array(new_matrix_case1.data)[:4,:4], annot=True, fmt='.2g', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[1], cbar=False, vmin=global_min, vmax=global_max)
+        sns.heatmap(np.array(new_matrix_case2.data)[:4,:4], annot=True, fmt='.2g', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[2], cbar=True, vmin=global_min, vmax=global_max)
+        plt.show()
+        '''
         print('#####TERM_1 (How much to subtract/add in CASE1)')
         print(pd.DataFrame(np.array(weight_for_emo_no_shift_out_activate*model.activate_fun((0-0.5)*weight_for_emo_shift_in_activate).data).round(2)))
         print('#####TERM_1 (How much to subtract/add in CASE2)')
         print(pd.DataFrame(np.array(weight_for_emo_with_shift_out_activate*model.activate_fun((1-0.5)*weight_for_emo_shift_in_activate).data).round(2)))
         print('#####multiplier_after_softmax (Diagonal value (-1) is constant)')
         print(pd.DataFrame(np.array(multiplier_after_softmax_6_6)).round(2))
-        
+        print('#####weight_for_emo_shift_in_activate')
+        print(pd.DataFrame(np.array(weight_for_emo_shift_in_activate.data)).round(2))
+        print('#####weight_for_emo_no_shift_out_activate')
+        print(pd.DataFrame(np.array(weight_for_emo_no_shift_out_activate.data)).round(2))
+        print('#####weight_for_emo_with_shift_out_activate')
+        print(pd.DataFrame(np.array(weight_for_emo_with_shift_out_activate.data)).round(2))
+        '''
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='dialog_rearrange_output')
@@ -149,13 +174,24 @@ if __name__ == "__main__":
                 bias_dict[k] = 0.0
         '''
     p, g = [], []
+    emo_shift_list, emo_no_shift_list, all_list = [], [], []
     for utt in bias_dict_label:
         if 'Ses0' in utt:
+            all_list.append(bias_dict[utt])
             if bias_dict[utt] > 0.5:
                 p.append(1)
+                #emo_shift_list.append(bias_dict[utt])
             else:
                 p.append(0)
+                #emo_no_shift_list.append(bias_dict[utt])
             g.append(int(bias_dict_label[utt]))
+            if int(bias_dict_label[utt]) == 1:
+                emo_shift_list.append(bias_dict[utt])
+            else:
+                emo_no_shift_list.append(bias_dict[utt])
+    print('AVG of emo_shift prob.:', round(np.mean(emo_shift_list), 2), '+-', round(np.std(emo_shift_list, ddof=0), 2))
+    print('AVG of emo_no_shift prob.:', round(np.mean(emo_no_shift_list), 2), '+-', round(np.std(emo_no_shift_list, ddof=0), 2))
+    print('AVG of all prob.:', round(np.mean(all_list), 2), '+-', round(np.std(all_list, ddof=0), 2))
     print('## EMO_SHIFT MODEL PERFORMANCE ##')
     print(len(p), len(g))
     print('UAR:', round(recall_score(g, p, average='macro')*100, 2), '%')
@@ -271,31 +307,31 @@ if __name__ == "__main__":
     emo_to_ix = {"ang": 0, "hap": 1, "neu": 2, "sad": 3, START_TAG: 4, STOP_TAG: 5}
 
     # Load model
-    model_1 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_1 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_1.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
 
-    model_2 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_2 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_2.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
 
-    model_3 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_3 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_3.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
 
-    model_4 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_4 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_4.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
 
-    model_5 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device, margin=0.0)
+    model_5 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_5.to(device)
     checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])
@@ -401,10 +437,11 @@ if __name__ == "__main__":
             
     print('pretrained UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
     print('pretrained ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
-    '''
+    
     #analysis: new matrix(case1: emo_shift prob.=0 & case2:emo_shift prob.=1)
     print('##########MODEL_1##########')
     view_new_matrix(model_1)
+    '''
     print('##########MODEL_2##########')
     view_new_matrix(model_2)
     print('##########MODEL_3##########')
@@ -414,3 +451,4 @@ if __name__ == "__main__":
     print('##########MODEL_5##########')
     view_new_matrix(model_5)
     '''
+    
