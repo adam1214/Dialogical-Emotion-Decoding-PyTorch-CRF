@@ -52,29 +52,31 @@ def view_new_matrix(model):
         weight_for_emo_no_shift_out_activate = torch.cat([weight_for_emo_no_shift_out_activate, weight_for_emo_no_shift_out_activate, weight_for_emo_no_shift_out_activate, weight_for_emo_no_shift_out_activate, torch.zeros(1,6), torch.zeros(1,6)], dim=0)
         
         new_matrix_case1 = model.transitions + weight_for_emo_no_shift_out_activate*model.activate_fun((0-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
-        print('#####OLD:')
-        print(pd.DataFrame((np.array(model.transitions)[:4,:4])).round(2))
+        print('#####INTRA:')
+        print(pd.DataFrame((np.load('intra_trans.npy')[:4,:4])).round(2))
         print('#####CASE1: NO SHIFT')
         print(pd.DataFrame((np.array(new_matrix_case1.data)[:4,:4])).round(2))
         new_matrix_case2 = model.transitions + weight_for_emo_with_shift_out_activate*model.activate_fun((1-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
         print('#####CASE2: WITH SHIFT')
         print(pd.DataFrame(np.array(new_matrix_case2.data)[:4,:4]).round(2))
         
-        fig, axs = plt.subplots(ncols=3, gridspec_kw=dict(width_ratios=[1,1,1.2]))
-        #sns.set(rc={'figure.figsize':(40,8)})
+        fig, axs = plt.subplots(ncols=3, gridspec_kw=dict(width_ratios=[1,1,1.25]))
+        fig.set_size_inches(12, 3) 
         global_max = -100
         global_min = 100
-        for matrix in [np.array(model.transitions)[:4,:4], np.array(new_matrix_case1.data)[:4,:4], np.array(new_matrix_case2.data)[:4,:4]]:
+        for matrix in [np.load('intra_trans.npy')[:4,:4], np.array(new_matrix_case1.data)[:4,:4], np.array(new_matrix_case2.data)[:4,:4]]:
             local_min = matrix.min()
             local_max = matrix.max()
             if global_max < local_max:
                 global_max = local_max
             if global_min > local_min:
                 global_min = local_min
-        sns.heatmap(np.array(model.transitions)[:4,:4], annot=True, fmt='.2g', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], ax=axs[0], cbar=False, vmin=global_min, vmax=global_max)
-        sns.heatmap(np.array(new_matrix_case1.data)[:4,:4], annot=True, fmt='.2g', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[1], cbar=False, vmin=global_min, vmax=global_max)
-        sns.heatmap(np.array(new_matrix_case2.data)[:4,:4], annot=True, fmt='.2g', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[2], cbar=True, vmin=global_min, vmax=global_max)
-        plt.show()
+        sns.set(font_scale=3)
+        sns.heatmap(np.load('intra_trans.npy')[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], ax=axs[0], cbar=False, vmin=global_min, vmax=global_max, square=True, cmap="gray_r", annot_kws={"size": 14})
+        sns.heatmap(np.array(new_matrix_case1.data)[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[1], cbar=False, vmin=global_min, vmax=global_max, square=True, cmap="gray_r", annot_kws={"size": 14})
+        sns.heatmap(np.array(new_matrix_case2.data)[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[2], cbar=True, vmin=global_min, vmax=global_max, square=True, cbar_kws={"shrink": 1}, cmap="gray_r", annot_kws={"size": 14})
+        #plt.show()
+        plt.savefig('matrix_heatmap.png')
         '''
         print('#####TERM_1 (How much to subtract/add in CASE1)')
         print(pd.DataFrame(np.array(weight_for_emo_no_shift_out_activate*model.activate_fun((0-0.5)*weight_for_emo_shift_in_activate).data).round(2)))
@@ -451,4 +453,3 @@ if __name__ == "__main__":
     print('##########MODEL_5##########')
     view_new_matrix(model_5)
     '''
-    

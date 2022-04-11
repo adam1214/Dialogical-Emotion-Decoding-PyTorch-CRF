@@ -3,6 +3,9 @@ from sklearn.metrics import accuracy_score, f1_score, recall_score
 import pdb
 import numpy as np 
 import pandas as pd
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 def split_dialog(dialogs):
   """Split utterances in a dialog into a set of speaker's utternaces in that dialog.
@@ -42,13 +45,13 @@ def get_16_case_performance(case_list_dict, model_outputs):
     case_performance_dict = {}
     for key_trans in case_list_dict:
         #case_performance_dict[key_trans[0:3]+'_UAR'] = recall_score(case_dict_label[key_trans], case_list_dict[key_trans], average='macro')
-        case_performance_dict[key_trans[0:3]+'_ACC'] = accuracy_score(case_dict_label[key_trans], case_list_dict[key_trans])
+        case_performance_dict[key_trans[0:3]+'_RECALL'] = accuracy_score(case_dict_label[key_trans], case_list_dict[key_trans])
         
     return case_performance_dict
 
 def check_model_performance(out_dict):
     pred, gt = [], []
-    for utt in iaan_out_dict:
+    for utt in intra_crf_outputs:
         if emo_dict[utt] in ['ang', 'hap', 'neu', 'sad']:
             try:
                 pred.append(out_dict[utt].argmax())
@@ -59,6 +62,7 @@ def check_model_performance(out_dict):
     print('ACC:', round(accuracy_score(gt, pred)*100, 2), '%')
 
 if __name__ == '__main__':
+    intra_crf_outputs = joblib.load('./intra_crf_preds_4.pkl')
     iaan_output_fold1 = joblib.load('../../../../data/dialog_rearrange_output/utt_logits_outputs_fold1.pkl')
     iaan_output_fold2 = joblib.load('../../../../data/dialog_rearrange_output/utt_logits_outputs_fold2.pkl')
     iaan_output_fold3 = joblib.load('../../../../data/dialog_rearrange_output/utt_logits_outputs_fold3.pkl')
@@ -70,7 +74,7 @@ if __name__ == '__main__':
     spk_dialog_edit = split_dialog(dialog_edit)
     emo_dict = joblib.load('../../../../data/emo_all_iemocap.pkl')
     emo_num_dict = {'ang':0, 'hap':1, 'neu':2, 'sad':3}
-    
+    '''
     iaan_out_dict = {}
     for utt in iaan_output_fold1:
         if utt[4] == '1':
@@ -83,9 +87,9 @@ if __name__ == '__main__':
             iaan_out_dict[utt] = iaan_output_fold4[utt]
         elif utt[4] == '5':
             iaan_out_dict[utt] = iaan_output_fold5[utt]
-
-    print('CHECK IAAN PERFORMANCE:')
-    check_model_performance(iaan_out_dict)
+    '''
+    print('CHECK intra_crf PERFORMANCE:')
+    check_model_performance(intra_crf_outputs)
     print('##########')
     
     print('CHECK RESCORING ALGO. PERFORMANCE:')
@@ -114,30 +118,60 @@ if __name__ == '__main__':
     for key_trans in case_dict_label:
         case_total_utt_cnt += len(case_dict_label[key_trans])
     print('check total utt in 16 case:', case_total_utt_cnt/2)
-    
+    '''
     # iaan case1~16 performance
     iaan_case_list_dict = {}
     iaan_case_performance_dict = get_16_case_performance(iaan_case_list_dict, iaan_out_dict)
-    
+    '''
+    intra_crf_case_list_dict = {}
+    intra_crf_case_performance_dict = get_16_case_performance(intra_crf_case_list_dict, intra_crf_outputs)
     # rescoring lago. case1~16 performance
     rescoring_case_list_dict = {}
     rescoring_case_performance_dict = get_16_case_performance(rescoring_case_list_dict, rescoring_outputs)
     
     # imporve percent
-    result_performance_dict = {}
+    result_performance_cnt_dict = {}
+    result_performance_recall_dict = {}
     for key_trans in rescoring_case_performance_dict:
-        result_performance_dict[key_trans] = round(100*(rescoring_case_performance_dict[key_trans] - iaan_case_performance_dict[key_trans]), 2)
-        
-    key_sorting_list = sorted(result_performance_dict, key=result_performance_dict.get, reverse=True) # [Large, ... , Small]
+        result_performance_cnt_dict[key_trans] = (rescoring_case_performance_dict[key_trans] - intra_crf_case_performance_dict[key_trans])*len(case_dict_label[key_trans[0:3]+'_emo_list'])
+        result_performance_recall_dict[key_trans] = 100*(rescoring_case_performance_dict[key_trans] - intra_crf_case_performance_dict[key_trans])
+    #key_sorting_list = sorted(result_performance_dict, key=result_performance_dict.get, reverse=True) # [Large, ... , Small]
     '''
     for i in range(0, 5, 1):
         print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]], '%')
     '''
-    
+    '''
     display_count = 0
     for i in range(0, len(key_sorting_list), 1):
         if key_sorting_list[i][0] != key_sorting_list[i][2]:
-            print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]], '%', '/', len(rescoring_case_list_dict[key_sorting_list[i][0:3]+'_emo_list']))
+            #print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]], '%', '/', len(rescoring_case_list_dict[key_sorting_list[i][0:3]+'_emo_list']))
+            print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]])
             display_count += 1
         if display_count == 5:
             break
+    '''
+    for result_dict in [result_performance_recall_dict, result_performance_cnt_dict]:
+        result_list = [[],[],[],[]]
+        result_list[0].append(result_dict['a2a_RECALL'])
+        result_list[0].append(result_dict['h2a_RECALL'])
+        result_list[0].append(result_dict['n2a_RECALL'])
+        result_list[0].append(result_dict['s2a_RECALL'])
+        
+        result_list[1].append(result_dict['a2h_RECALL'])
+        result_list[1].append(result_dict['h2h_RECALL'])
+        result_list[1].append(result_dict['n2h_RECALL'])
+        result_list[1].append(result_dict['s2h_RECALL'])
+        
+        result_list[2].append(result_dict['a2n_RECALL'])
+        result_list[2].append(result_dict['h2n_RECALL'])
+        result_list[2].append(result_dict['n2n_RECALL'])
+        result_list[2].append(result_dict['s2n_RECALL'])
+        
+        result_list[3].append(result_dict['a2s_RECALL'])
+        result_list[3].append(result_dict['h2s_RECALL'])
+        result_list[3].append(result_dict['n2s_RECALL'])
+        result_list[3].append(result_dict['s2s_RECALL'])
+        plt.figure()
+        sns.set(font_scale=2)
+        sns.heatmap(np.array(result_list), annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], cbar=True, square=True, cmap="OrRd", annot_kws={"size": 14})
+        break

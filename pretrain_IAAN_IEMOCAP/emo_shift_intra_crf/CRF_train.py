@@ -99,7 +99,6 @@ class CRF(nn.Module):
                     1, -1).expand(1, self.tagset_size)
                 # the ith entry of trans_score is the score of transitioning to
                 # next_tag from i
-                
                 if next_tag < 4: # 0 1 2 3
                     multiplier_row = multiplier_after_softmax[next_tag]
                     multiplier_row.data[next_tag] = -1

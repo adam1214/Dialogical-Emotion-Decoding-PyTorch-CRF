@@ -120,9 +120,9 @@ if __name__ == "__main__":
         for utt in bias_dict:
             bias_dict[utt] = 1.0
     else:
-        #bias_dict = joblib.load('../data/'+ args.pretrain_version + '/LogisticRegression_emo_shift_output.pkl')
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_upsample.pkl')
         #bias_dict = bias_dict_label
-        
+        '''
         emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold1.pkl')
         emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold2.pkl')
         emo_prob_fold3 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold3.pkl')
@@ -140,7 +140,7 @@ if __name__ == "__main__":
                 bias_dict[utt] = emo_prob_fold4[utt]
             elif utt[4] == '5':
                 bias_dict[utt] = emo_prob_fold5[utt]
-        
+        '''
         '''
         for k in bias_dict:
             if bias_dict[k] > 0.5:

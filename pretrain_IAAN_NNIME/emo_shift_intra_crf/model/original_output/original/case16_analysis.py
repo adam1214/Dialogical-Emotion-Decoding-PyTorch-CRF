@@ -126,7 +126,7 @@ if __name__ == '__main__':
     # imporve percent
     result_performance_dict = {}
     for key_trans in rescoring_case_performance_dict:
-        result_performance_dict[key_trans] = round(100*(rescoring_case_performance_dict[key_trans] - iaan_case_performance_dict[key_trans]), 2)
+        result_performance_dict[key_trans] = (rescoring_case_performance_dict[key_trans] - iaan_case_performance_dict[key_trans])*len(case_dict_label[key_trans[0:3]+'_emo_list'])
         
     key_sorting_list = sorted(result_performance_dict, key=result_performance_dict.get, reverse=True) # [Large, ... , Small]
     '''
@@ -137,7 +137,8 @@ if __name__ == '__main__':
     display_count = 0
     for i in range(0, len(key_sorting_list), 1):
         if key_sorting_list[i][0] != key_sorting_list[i][2]:
-            print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]], '%', '/', len(rescoring_case_list_dict[key_sorting_list[i][0:3]+'_emo_list']))
+            #print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]], '%', '/', len(rescoring_case_list_dict[key_sorting_list[i][0:3]+'_emo_list']))
+            print(key_sorting_list[i][0:3], result_performance_dict[key_sorting_list[i]])
             display_count += 1
         if display_count == 5:
             break

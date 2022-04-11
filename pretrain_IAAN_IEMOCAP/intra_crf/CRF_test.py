@@ -8,6 +8,7 @@ import argparse
 from argparse import RawTextHelpFormatter
 import utils
 from sklearn.metrics import confusion_matrix, recall_score, accuracy_score
+import pandas as pd
 
 def argmax(vec):
     # return the argmax as a python int
@@ -26,7 +27,7 @@ def log_sum_exp(vec):
     max_score_broadcast = max_score.view(1, -1).expand(1, vec.size()[1])
     return max_score + \
         torch.log(torch.sum(torch.exp(vec - max_score_broadcast)))
-        
+
 class CRF(nn.Module):
 
     def __init__(self, vocab_size, emo_to_ix):
@@ -164,6 +165,12 @@ class CRF(nn.Module):
 def softmax(x):
     f_x = np.exp(x) / np.sum(np.exp(x))
     return f_x
+
+def view_new_matrix(model):
+    with torch.no_grad():
+        print('#####OLD:')
+        print(pd.DataFrame(np.array(model.transitions)[:4,:4]).round(2))
+        np.save('intra_trans.npy', np.array(model.transitions)[:4,:4])
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
@@ -449,3 +456,11 @@ if __name__ == "__main__":
             
     print('pretrained UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
     print('pretrained ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
+    
+    print('##########MODEL_1##########')
+    view_new_matrix(model_1)
+    #view_new_matrix(model_2)
+    #view_new_matrix(model_3)
+    #view_new_matrix(model_4)
+    #view_new_matrix(model_5)
+    
