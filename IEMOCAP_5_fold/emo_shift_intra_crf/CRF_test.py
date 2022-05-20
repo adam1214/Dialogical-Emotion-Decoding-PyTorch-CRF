@@ -150,7 +150,7 @@ if __name__ == "__main__":
         elif utt[4] == '5':
             out_dict[utt] = output_fold5[utt]
     '''
-    out_dict = joblib.load('../data/'+ args.pretrain_version + '/DAG_outputs_4_all_fold_text_audio.pkl')
+    out_dict = joblib.load('../data/'+ args.pretrain_version + '/DAG_outputs_4_all_audio.pkl')
     #dialogs = joblib.load('../data/dialog_iemocap.pkl')
     #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     dialogs = joblib.load('../data/dialog_rearrange.pkl')
@@ -171,7 +171,7 @@ if __name__ == "__main__":
             bias_dict[utt] = 1.0
     else:
         bias_dict = joblib.load('../data/'+ args.pretrain_version + '/SVM_emo_shift_output_audio.pkl')
-        bias_dict = bias_dict_label
+        #bias_dict = bias_dict_label
         '''
         emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold1.pkl')
         emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold2.pkl')
@@ -466,11 +466,11 @@ if __name__ == "__main__":
     print('pretrained UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
     print('pretrained ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
     print('pretrained F1:', round(f1_score(labels, predicts, average='weighted')*100, 2), '%')
-    
+    '''
     #analysis: new matrix(case1: emo_shift prob.=0 & case2:emo_shift prob.=1)
     view_new_matrix(model_1, fold_num=1)
     view_new_matrix(model_2, fold_num=2)
     view_new_matrix(model_3, fold_num=3)
     view_new_matrix(model_4, fold_num=4)
     view_new_matrix(model_5, fold_num=5)
-    
+    '''

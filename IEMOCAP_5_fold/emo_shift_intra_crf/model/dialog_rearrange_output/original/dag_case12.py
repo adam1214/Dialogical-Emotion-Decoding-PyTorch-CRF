@@ -166,11 +166,15 @@ def analyze_case1_2(emo_dict, outputs, dialog, emo2num, case1_dict, case2_dict):
 if __name__ == '__main__':
     total_closest = 0
     closest_self_opp_cnt = 0
+    original_utt_text = joblib.load('../../../../data/original_utt_text.pkl')
     dialog = joblib.load('../../../../data/dialog_rearrange.pkl')
     dialog_edit = joblib.load('../../../../data/dialog_rearrange_4emo_iemocap.pkl')
     emo_dict = joblib.load('../../../../data/emo_all_iemocap.pkl')
+    emo_shift_all = joblib.load('../../../../data/dialog_rearrange_output/4emo_shift_all_rearrange.pkl')
     outputs = joblib.load('./preds_4.pkl')
+    pretrained_outputs = joblib.load('../../../../data/dialog_rearrange_output/DAG_outputs_4_all_audio.pkl')
     emo2num = {'ang': 0, 'hap': 1, 'neu': 2, 'sad': 3}
+    num2emo = {0:'ang', 1:'hap', 2:'neu', 3:'sad'}
     
     emo_set = set()
     for k in emo_dict:
@@ -223,4 +227,36 @@ if __name__ == '__main__':
                 case2_dict[len(case2_dict)-1]['U_r_emo'] = opp_label
         
     analyze_case1_2(emo_dict, outputs, dialog, emo2num, case1_dict, case2_dict)
-        
+    
+    utt_name_first_9_with_many_emo_shift_case_dict = {}
+    for dia in dialog_edit:
+        for i, utt in enumerate(dialog_edit[dia]):
+            emo_shift_cnt = 0
+            for j in range(i, i+9, 1):
+                if j == len(dialog_edit[dia]):
+                    break
+                elif emo_shift_all[dialog_edit[dia][j]] == 1.0:
+                    emo_shift_cnt += 1
+            if emo_shift_cnt >= 5:
+                utt_name_first_9_with_many_emo_shift_case_dict[utt] = emo_shift_cnt
+                
+    utt_name_first_9_with_many_correct_emo_shift_case_dict = {}
+    for utt in utt_name_first_9_with_many_emo_shift_case_dict:
+        dia_name = utt[:-5]
+        utt_index = dialog_edit[dia_name].index(utt)
+        #print('###############')
+        emo_shift_correct_cnt = 0
+        for j in range(utt_index, utt_index+9, 1):
+            if j == len(dialog_edit[dia_name]):
+                break
+            #print(dialog_edit[dia_name][j], dialog_edit[dia_name][j][-4], emo_dict[dialog_edit[dia_name][j]], num2emo[pretrained_outputs[dialog_edit[dia_name][j]].argmax()], num2emo[outputs[dialog_edit[dia_name][j]]])
+            if emo_dict[dialog_edit[dia_name][j]] == num2emo[outputs[dialog_edit[dia_name][j]]] and emo_dict[dialog_edit[dia_name][j]] != num2emo[pretrained_outputs[dialog_edit[dia_name][j]].argmax()] and emo_shift_all[dialog_edit[dia_name][j]] == 1.0:
+                emo_shift_correct_cnt += 1
+        if emo_shift_correct_cnt > 1:
+            utt_name_first_9_with_many_correct_emo_shift_case_dict[dialog_edit[dia_name][utt_index]] = emo_shift_correct_cnt
+            for j in range(utt_index, utt_index+9, 1):
+                if j == len(dialog_edit[dia_name]):
+                    break
+                correct_shift_flag = (emo_dict[dialog_edit[dia_name][j]] == num2emo[outputs[dialog_edit[dia_name][j]]] and emo_dict[dialog_edit[dia_name][j]] != num2emo[pretrained_outputs[dialog_edit[dia_name][j]].argmax()] and emo_shift_all[dialog_edit[dia_name][j]] == 1.0)
+                print(dialog_edit[dia_name][j], dialog_edit[dia_name][j][-4], emo_dict[dialog_edit[dia_name][j]], num2emo[pretrained_outputs[dialog_edit[dia_name][j]].argmax()], num2emo[outputs[dialog_edit[dia_name][j]]], correct_shift_flag, emo_shift_all[dialog_edit[dia_name][j]], original_utt_text[dialog_edit[dia_name][j]][:-1])
+            print('###############')
