@@ -168,9 +168,9 @@ def analyze_case1_2(emo_dict, outputs, dialog, emo2num, case1_dict, case2_dict):
 if __name__ == '__main__':
     total_closest = 0
     closest_self_opp_cnt = 0
-    dialog = joblib.load('../../../../data/speech_only/dialogs_speech_only.pkl')
-    dialog_edit = joblib.load('../../../../data/speech_only/dialogs_edit_speech_only.pkl')
-    emo_dict = joblib.load('../../../../data/speech_only/emo_all_speech_only.pkl')
+    dialog = joblib.load('../../../../data/dialogs.pkl')
+    dialog_edit = joblib.load('../../../../data/dialogs_4emo.pkl')
+    emo_dict = joblib.load('../../../../data/emo_all.pkl')
     outputs = joblib.load('./preds_4.pkl')
     emo2num = {'Anger':0, 'Happiness':1, 'Neutral':2, 'Sadness':3}
     

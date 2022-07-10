@@ -53,7 +53,7 @@ def view_new_matrix(model, fold_num):
         
         new_matrix_case1 = model.transitions + weight_for_emo_no_shift_out_activate*model.activate_fun((0-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
         print('#####INTRA:')
-        print(pd.DataFrame((np.load('intra_trans.npy')[:4,:4])).round(2))
+        print(pd.DataFrame((np.load('../intra_crf/intra_trans_fold' + str(fold_num) + '.npy')[:4,:4])).round(2))
         print('#####CASE1: NO SHIFT')
         print(pd.DataFrame((np.array(new_matrix_case1.data)[:4,:4])).round(2))
         new_matrix_case2 = model.transitions + weight_for_emo_with_shift_out_activate*model.activate_fun((1-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
@@ -64,7 +64,7 @@ def view_new_matrix(model, fold_num):
         fig.set_size_inches(12, 3) 
         global_max = -100
         global_min = 100
-        for matrix in [np.load('intra_trans.npy')[:4,:4], np.array(new_matrix_case1.data)[:4,:4], np.array(new_matrix_case2.data)[:4,:4]]:
+        for matrix in [np.load('../intra_crf/intra_trans_fold' + str(fold_num) + '.npy')[:4,:4], np.array(new_matrix_case1.data)[:4,:4], np.array(new_matrix_case2.data)[:4,:4]]:
             local_min = matrix.min()
             local_max = matrix.max()
             if global_max < local_max:
@@ -72,7 +72,7 @@ def view_new_matrix(model, fold_num):
             if global_min > local_min:
                 global_min = local_min
         sns.set(font_scale=3)
-        sns.heatmap(np.load('intra_trans.npy')[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], ax=axs[0], cbar=False, vmin=global_min, vmax=global_max, square=True, cmap="gray_r", annot_kws={"size": 14})
+        sns.heatmap(np.load('../intra_crf/intra_trans_fold' + str(fold_num) + '.npy')[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], ax=axs[0], cbar=False, vmin=global_min, vmax=global_max, square=True, cmap="gray_r", annot_kws={"size": 14})
         sns.heatmap(np.array(new_matrix_case1.data)[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[1], cbar=False, vmin=global_min, vmax=global_max, square=True, cmap="gray_r", annot_kws={"size": 14})
         sns.heatmap(np.array(new_matrix_case2.data)[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[2], cbar=True, vmin=global_min, vmax=global_max, square=True, cbar_kws={"shrink": 1}, cmap="gray_r", annot_kws={"size": 14})
         #plt.show()
@@ -119,6 +119,9 @@ if __name__ == "__main__":
     parser.add_argument('-v', "--pretrain_version", type=str, help="which version of pretrain model you want to use?", default='original_output')
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'model')
+    parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 777) 
+    # 1 for iaan & text_audio DAG & text_audio svm, else 777
+    # Analysis of Transitions Adjustment – NNIME, plz use seed 1
     args = parser.parse_args()
     
     print(args)
@@ -150,36 +153,47 @@ if __name__ == "__main__":
         elif utt[4] == '5':
             out_dict[utt] = output_fold5[utt]
     '''
-    out_dict = joblib.load('../data/speech_only/outputs_4_all_fold_text.pkl')
+    emo2num = {'Anger':0, 'Happiness':1, 'Neutral':2, 'Sadness':3}
+    out_dict = joblib.load('../data/original_output/text_audio/DAG_outputs_4_all_fold_interspeech_text_audio.pkl')
+    emo_dict = joblib.load('../data/emo_all.pkl')
+    for utt in out_dict:
+        if emo_dict[utt] in ['Anger', 'Happiness', 'Neutral', 'Sadness']:
+            out_dict[utt] = np.zeros(4)
+            out_dict[utt][emo2num[emo_dict[utt]]] = 1.0
+    
     #dialogs = joblib.load('../data/dialog_iemocap.pkl')
     #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
-    dialogs = joblib.load('../data/speech_only/dialogs_speech_only.pkl')
-    dialogs_edit = joblib.load('../data/speech_only/dialogs_edit_speech_only.pkl')
+    dialogs = joblib.load('../data/dialogs.pkl')
+    dialogs_edit = joblib.load('../data/dialogs_4emo.pkl')
     
     if args.dataset == 'original':
-        emo_dict = joblib.load('../data/speech_only/emo_all_speech_only.pkl')
+        emo_dict = joblib.load('../data/emo_all.pkl')
         dias = dialogs_edit
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all.pkl')
         dias = dialogs
     
-    bias_dict_label = joblib.load('../data/speech_only/4emo_shift_all_speech_only.pkl')
+    bias_dict_label = joblib.load('../data/original_output/4emo_shift_all.pkl')
     if args.emo_shift == 'constant':
         spk_dialogs = utils.split_dialog(dias)
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
         for utt in bias_dict:
             bias_dict[utt] = 1.0
     else:
-        bias_dict = joblib.load('../data/speech_only/rf_emo_shift_output_text.pkl')
-        #bias_dict = bias_dict_label
+        bias_dict = joblib.load('../data/original_output/text_audio/svm_emo_shift_output_interspeech_tmp2_text_audio.pkl')
+        bias_dict = bias_dict_label
         '''
-        emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold1.pkl')
-        emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold2.pkl')
-        emo_prob_fold3 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold3.pkl')
-        emo_prob_fold4 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold4.pkl')
-        emo_prob_fold5 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold5.pkl')
+        for utt in bias_dict:
+            bias_dict[utt] = 0.0
+        '''
+        '''
+        emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/text_audio/svm_emo_shift_output_interspeech_tmp_text_audio_fold1.pkl')
+        emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/text_audio/svm_emo_shift_output_interspeech_tmp_text_audio_fold2.pkl')
+        emo_prob_fold3 = joblib.load('../data/'+ args.pretrain_version + '/text_audio/svm_emo_shift_output_interspeech_tmp_text_audio_fold3.pkl')
+        emo_prob_fold4 = joblib.load('../data/'+ args.pretrain_version + '/text_audio/svm_emo_shift_output_interspeech_tmp_text_audio_fold4.pkl')
+        emo_prob_fold5 = joblib.load('../data/'+ args.pretrain_version + '/text_audio/svm_emo_shift_output_interspeech_tmp_text_audio_fold5.pkl')
         bias_dict = {}
-        for utt in emo_prob_fold1:
+        for utt in bias_dict_label:
             if utt[4] == '1':
                 bias_dict[utt] = emo_prob_fold1[utt]
             elif utt[4] == '2':
@@ -336,31 +350,31 @@ if __name__ == "__main__":
     # Load model
     model_1 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_1.to(device)
-    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses01_seed' + str(args.seed) + '.pth')
     model_1.load_state_dict(checkpoint['model_state_dict'])
     model_1.eval()
 
     model_2 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_2.to(device)
-    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses02_seed' + str(args.seed) + '.pth')
     model_2.load_state_dict(checkpoint['model_state_dict'])
     model_2.eval()
 
     model_3 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_3.to(device)
-    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses03_seed' + str(args.seed) + '.pth')
     model_3.load_state_dict(checkpoint['model_state_dict'])
     model_3.eval()
 
     model_4 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_4.to(device)
-    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses04_seed' + str(args.seed) + '.pth')
     model_4.load_state_dict(checkpoint['model_state_dict'])
     model_4.eval()
 
     model_5 = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model_5.to(device)
-    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05.pth')
+    checkpoint = torch.load('./model/' + args.pretrain_version + '/' + args.dataset + '/Ses05_seed' + str(args.seed) + '.pth')
     model_5.load_state_dict(checkpoint['model_state_dict'])
     model_5.eval()
     
@@ -403,7 +417,7 @@ if __name__ == "__main__":
             for j, utt in enumerate(test_data_Ses05[i][0]):
                 pred_dict[utt] = tmp[j]
 
-    ori_emo_dict = joblib.load('../data/speech_only/emo_all_speech_only.pkl')
+    ori_emo_dict = joblib.load('../data/emo_all.pkl')
     label = []
     for dia_emos_tuple in test_data_Ses01:
         for utt in dia_emos_tuple[0]:
@@ -437,6 +451,7 @@ if __name__ == "__main__":
     print('UAR:', uar)
     print('ACC:', acc)
     print('F1:', f1)
+    print('RECALL 4 types:', recall_score(label, predict, average=None))
     print(conf)
 
     path = 'uar.txt'
@@ -454,9 +469,8 @@ if __name__ == "__main__":
     # ensure pretrained model performance
     labels = []
     predicts = []
-    dialogs_edit = joblib.load('../data/speech_only/dialogs_edit_speech_only.pkl')
-    emo_dict = joblib.load('../data/speech_only/emo_all_speech_only.pkl')
-    emo2num = {'Anger':0, 'Happiness':1, 'Neutral':2, 'Sadness':3}
+    dialogs_edit = joblib.load('../data/dialogs_4emo.pkl')
+    emo_dict = joblib.load('../data/emo_all.pkl')
     
     for dialog_name in dialogs_edit:
         for utt in dialogs_edit[dialog_name]:
@@ -466,10 +480,11 @@ if __name__ == "__main__":
     print('pretrained UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
     print('pretrained ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
     print('pretrained F1:', round(f1_score(labels, predicts, average='weighted')*100, 2), '%')
-    '''
-    view_new_matrix(model_1, fold_num=1)
-    view_new_matrix(model_2, fold_num=2)
-    view_new_matrix(model_3, fold_num=3)
-    view_new_matrix(model_4, fold_num=4)
-    view_new_matrix(model_5, fold_num=5)
-    '''
+    print('pretrained RECALL 4 types:', recall_score(labels, predicts, average=None))
+    
+    #view_new_matrix(model_1, fold_num=1)
+    #view_new_matrix(model_2, fold_num=2)
+    #view_new_matrix(model_3, fold_num=3)
+    #view_new_matrix(model_4, fold_num=4)
+    #view_new_matrix(model_5, fold_num=5)
+    

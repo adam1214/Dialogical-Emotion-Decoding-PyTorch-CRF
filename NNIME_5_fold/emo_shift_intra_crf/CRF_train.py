@@ -238,7 +238,8 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--dataset", type=str, help="which dataset to use? original or C2C or U2U", default = 'original')
     parser.add_argument("-e", "--emo_shift", type=str, help="which emo_shift prob. to use?", default = 'model')
     parser.add_argument("-t", "--train_source", type=str, help="which training source to use? label or pretrained model(model)?", default = 'label')
-    parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1)
+    parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 1) #interspeech ver.
+    #parser.add_argument("-s", "--seed", type=int, help="select torch seed", default = 777)
     args = parser.parse_args()
     print(args)
     os.environ["CUDA_VISIBLE_DEVICES"] = "0" 
@@ -254,13 +255,11 @@ if __name__ == "__main__":
     output_fold5 = joblib.load('../data/original_output/utt_logits_outputs_fold5.pkl')
         
     #out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
-    #dialogs = joblib.load('../data/dialog_iemocap.pkl')
-    #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
-    dialogs = joblib.load('../data/speech_only/dialogs_speech_only.pkl')
-    dialogs_edit = joblib.load('../data/speech_only/dialogs_edit_speech_only.pkl')
+    dialogs = joblib.load('../data/dialogs.pkl')
+    dialogs_edit = joblib.load('../data/dialogs_4emo.pkl')
     
     if args.dataset == 'original':
-        emo_dict = joblib.load('../data/speech_only/emo_all_speech_only.pkl')
+        emo_dict = joblib.load('../data/emo_all.pkl')
         dias = dialogs_edit
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all.pkl')
@@ -290,7 +289,7 @@ if __name__ == "__main__":
         bias_dict = utils.get_val_bias(spk_dialogs, emo_dict)
     else:
         #bias_dict = joblib.load('../data/'+ args.pretrain_version + '/4emo_shift_all.pkl')
-        bias_dict = joblib.load('../data/speech_only/4emo_shift_all_speech_only.pkl')
+        bias_dict = joblib.load('../data/original_output/4emo_shift_all.pkl')
         '''
         for utt in bias_dict:
             if 'Ses0' in utt:
@@ -475,14 +474,14 @@ if __name__ == "__main__":
     
     model = CRF(len(utt_to_ix), emo_to_ix, out_dict, bias_dict, ix_to_utt, device)
     model.to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=0.1, momentum=0.5)
-
-    #max_uar_val = 0
+    optimizer = optim.SGD(model.parameters(), lr=0.001, weight_decay=0.1, momentum=0.5) #interspeech ver.
+    
+    max_uar_val = 0
     max_f1_val = 0
     best_epoch = -1
     val_loss_list = []
     train_loss_list = []
-    for epoch in range(1, 70+1, 1):
+    for epoch in range(1, 70+1, 1): 
         train_loss_sum = 0
         for dialog, emos in train_data:
             # Step 1. Remember that Pytorch accumulates gradients.
@@ -520,12 +519,12 @@ if __name__ == "__main__":
         val_loss_list.append(val_loss_sum/len(val_data))
         
         #Save the best model so far
-        if f1_val > max_f1_val:
+        if uar_val > max_uar_val:
             best_epoch = epoch
-            max_f1_val = f1_val
+            max_uar_val = uar_val
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
-            torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth') 
-        print('EPOCH:', epoch, ', train_loss:', round(train_loss_list[-1], 4), ', val_loss:', round(val_loss_list[-1], 4), ', val_f1:', round(100 * f1_val, 2), '%')
+            torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.dataset + '/Ses0' + str(args.model_num) + '_seed' + str(args.seed) + '.pth') 
+        print('EPOCH:', epoch, ', train_loss:', round(train_loss_list[-1], 4), ', val_loss:', round(val_loss_list[-1], 4), ', val_uar:', round(100 * uar_val, 2), '%')
     print('The Best Epoch:', best_epoch)
 
     plt.plot(np.arange(len(train_loss_list))+1, train_loss_list, 's-', color = 'r', label="train_loss")

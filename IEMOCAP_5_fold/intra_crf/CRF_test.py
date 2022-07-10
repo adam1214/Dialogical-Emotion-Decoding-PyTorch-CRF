@@ -192,7 +192,7 @@ if __name__ == "__main__":
     output_fold3 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold3.pkl')
     output_fold4 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold4.pkl')
     output_fold5 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold5.pkl')
-    '''
+    
     out_dict = {}
     for utt in output_fold1:
         if utt[4] == '1':
@@ -205,8 +205,8 @@ if __name__ == "__main__":
             out_dict[utt] = output_fold4[utt]
         elif utt[4] == '5':
             out_dict[utt] = output_fold5[utt]
-    '''
-    out_dict = joblib.load('../data/'+ args.pretrain_version + '/DAG_outputs_4_all_fold_text_audio.pkl')
+    
+    #out_dict = joblib.load('../data/'+ args.pretrain_version + '/DAG_outputs_4_all_fold_text_audio.pkl')
     #dialogs = joblib.load('../data/dialog_iemocap.pkl')
     #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     dialogs = joblib.load('../data/dialog_rearrange.pkl')

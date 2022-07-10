@@ -184,11 +184,11 @@ if __name__ == "__main__":
     output_fold5 = joblib.load('../data/original_output/utt_logits_outputs_fold5.pkl')
             
     #out_dict = joblib.load('../data/'+ args.pretrain_version + '/outputs.pkl')
-    dialogs = joblib.load('../data/speech_only/dialogs_speech_only.pkl')
-    dialogs_edit = joblib.load('../data/speech_only/dialogs_edit_speech_only.pkl')
+    dialogs = joblib.load('../data/dialogs.pkl')
+    dialogs_edit = joblib.load('../data/dialogs_4emo.pkl')
     
     if args.dataset == 'original':
-        emo_dict = joblib.load('../data/speech_only/emo_all_speech_only.pkl')
+        emo_dict = joblib.load('../data/emo_all.pkl')
         dias = dialogs_edit
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all.pkl')
@@ -297,9 +297,9 @@ if __name__ == "__main__":
             label_val[i] = -1
     
     model = CRF(len(utt_to_ix), emo_to_ix)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-2, momentum=0.5)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=0.01, momentum=0.5)
 
-    #max_uar_val = 0
+    max_uar_val = 0
     max_f1_val = 0
     best_epoch = -1
     loss_list = []
@@ -342,9 +342,9 @@ if __name__ == "__main__":
         val_loss_list.append(val_loss_sum/len(val_data))
 
         #Save the best model so far
-        if f1_val > max_f1_val:
+        if uar_val > max_uar_val:
             best_epoch = epoch
-            max_f1_val = f1_val
+            max_uar_val = uar_val
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
             torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
             

@@ -54,7 +54,7 @@ def view_new_matrix(model, fold_num):
         
         new_matrix_case1 = model.transitions + weight_for_emo_no_shift_out_activate*model.activate_fun((0-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
         print('#####INTRA:')
-        print(pd.DataFrame((np.load('intra_trans.npy')[:4,:4])).round(2))
+        print(pd.DataFrame(np.load('../intra_crf/intra_trans_fold' + str(fold_num) + '.npy')[:4,:4]).round(2))
         print('#####CASE1: NO SHIFT')
         print(pd.DataFrame((np.array(new_matrix_case1.data)[:4,:4])).round(2))
         new_matrix_case2 = model.transitions + weight_for_emo_with_shift_out_activate*model.activate_fun((1-0.5)*weight_for_emo_shift_in_activate)*multiplier_after_softmax_6_6
@@ -65,7 +65,7 @@ def view_new_matrix(model, fold_num):
         fig.set_size_inches(12, 3) 
         global_max = -100
         global_min = 100
-        for matrix in [np.load('intra_trans.npy')[:4,:4], np.array(new_matrix_case1.data)[:4,:4], np.array(new_matrix_case2.data)[:4,:4]]:
+        for matrix in [np.load('../intra_crf/intra_trans_fold' + str(fold_num) + '.npy')[:4,:4], np.array(new_matrix_case1.data)[:4,:4], np.array(new_matrix_case2.data)[:4,:4]]:
             local_min = matrix.min()
             local_max = matrix.max()
             if global_max < local_max:
@@ -73,7 +73,7 @@ def view_new_matrix(model, fold_num):
             if global_min > local_min:
                 global_min = local_min
         sns.set(font_scale=3)
-        sns.heatmap(np.load('intra_trans.npy')[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], ax=axs[0], cbar=False, vmin=global_min, vmax=global_max, square=True, cmap="gray_r", annot_kws={"size": 14})
+        sns.heatmap(np.load('../intra_crf/intra_trans_fold' + str(fold_num) + '.npy')[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], ax=axs[0], cbar=False, vmin=global_min, vmax=global_max, square=True, cmap="gray_r", annot_kws={"size": 14})
         sns.heatmap(np.array(new_matrix_case1.data)[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[1], cbar=False, vmin=global_min, vmax=global_max, square=True, cmap="gray_r", annot_kws={"size": 14})
         sns.heatmap(np.array(new_matrix_case2.data)[:4,:4], annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=False, ax=axs[2], cbar=True, vmin=global_min, vmax=global_max, square=True, cbar_kws={"shrink": 1}, cmap="gray_r", annot_kws={"size": 14})
         #plt.show()
@@ -130,7 +130,8 @@ if __name__ == "__main__":
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
-    '''
+    ori_emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
+    
     output_fold1 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold1.pkl')
     output_fold2 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold2.pkl')
     output_fold3 = joblib.load('../data/dialog_rearrange_output/utt_logits_outputs_fold3.pkl')
@@ -149,8 +150,14 @@ if __name__ == "__main__":
             out_dict[utt] = output_fold4[utt]
         elif utt[4] == '5':
             out_dict[utt] = output_fold5[utt]
-    '''
-    out_dict = joblib.load('../data/'+ args.pretrain_version + '/DAG_outputs_4_all_audio.pkl')
+    emo_num_dict = {'ang':0, 'hap':1, 'neu':2, 'sad':3}
+    out_dict = joblib.load('../data/'+ args.pretrain_version + '/DAG_outputs_4_all_fold_text_audio.pkl')
+    
+    for utt in out_dict:
+        if ori_emo_dict[utt] in ['ang', 'hap', 'neu', 'sad']:
+            out_dict[utt] = np.zeros(4)
+            out_dict[utt][emo_num_dict[ori_emo_dict[utt]]] = 1.0
+    
     #dialogs = joblib.load('../data/dialog_iemocap.pkl')
     #dialogs_edit = joblib.load('../data/dialog_4emo_iemocap.pkl')
     dialogs = joblib.load('../data/dialog_rearrange.pkl')
@@ -170,14 +177,14 @@ if __name__ == "__main__":
         for utt in bias_dict:
             bias_dict[utt] = 1.0
     else:
-        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/SVM_emo_shift_output_audio.pkl')
-        #bias_dict = bias_dict_label
+        bias_dict = joblib.load('../data/'+ args.pretrain_version + '/SVM_emo_shift_output_text_audio.pkl')
+        bias_dict = bias_dict_label
         '''
-        emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold1.pkl')
-        emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold2.pkl')
-        emo_prob_fold3 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold3.pkl')
-        emo_prob_fold4 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold4.pkl')
-        emo_prob_fold5 = joblib.load('../data/'+ args.pretrain_version + '/MLPPytorch_emo_shift_output_fold5.pkl')
+        emo_prob_fold1 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold1.pkl')
+        emo_prob_fold2 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold2.pkl')
+        emo_prob_fold3 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold3.pkl')
+        emo_prob_fold4 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold4.pkl')
+        emo_prob_fold5 = joblib.load('../data/'+ args.pretrain_version + '/iaan_emo_shift_output_fold5.pkl')
         bias_dict = {}
         for utt in emo_prob_fold1:
             if utt[4] == '1':
@@ -403,7 +410,6 @@ if __name__ == "__main__":
             for j, utt in enumerate(test_data_Ses05[i][0]):
                 pred_dict[utt] = tmp[j]
 
-    ori_emo_dict = joblib.load('../data/emo_all_iemocap.pkl')
     label = []
     for dia_emos_tuple in test_data_Ses01:
         for utt in dia_emos_tuple[0]:
@@ -466,11 +472,11 @@ if __name__ == "__main__":
     print('pretrained UAR:', round(recall_score(labels, predicts, average='macro')*100, 2), '%')
     print('pretrained ACC:', round(accuracy_score(labels, predicts)*100, 2), '%')
     print('pretrained F1:', round(f1_score(labels, predicts, average='weighted')*100, 2), '%')
-    '''
+    
     #analysis: new matrix(case1: emo_shift prob.=0 & case2:emo_shift prob.=1)
-    view_new_matrix(model_1, fold_num=1)
-    view_new_matrix(model_2, fold_num=2)
-    view_new_matrix(model_3, fold_num=3)
-    view_new_matrix(model_4, fold_num=4)
-    view_new_matrix(model_5, fold_num=5)
-    '''
+    #view_new_matrix(model_1, fold_num=1)
+    #view_new_matrix(model_2, fold_num=2)
+    #view_new_matrix(model_3, fold_num=3)
+    #view_new_matrix(model_4, fold_num=4)
+    #view_new_matrix(model_5, fold_num=5)
+    

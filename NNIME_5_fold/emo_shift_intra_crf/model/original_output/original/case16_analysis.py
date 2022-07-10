@@ -38,7 +38,7 @@ def get_16_case_performance(case_list_dict, model_outputs, fold_num):
             if case_list_dict.get(key_trans.replace('utt', 'emo')) == None:
                 case_list_dict[key_trans.replace('utt', 'emo')] = []
             for utt in case_dict_label[key_trans]:
-                if utt[4] == fold_num:
+                if utt[4] == fold_num or fold_num == None:
                     try:
                         case_list_dict[key_trans.replace('utt', 'emo')].append(model_outputs[utt].argmax())
                     except:
@@ -66,19 +66,26 @@ def check_model_performance(out_dict):
     
 
 if __name__ == '__main__':
-    FOLD_NUM = '5'
+    #FOLD_NUM = '2'
+    FOLD_NUM = None
+    '''
     intra_tran_matrix = np.load('../../../../intra_crf/intra_trans_fold' + FOLD_NUM + '.npy')[:4,:4]
     ESA_no_shift_tran_matrix = np.load('../../../../emo_shift_intra_crf/ESA_no_shift_trans_fold' + FOLD_NUM + '.npy')[:4,:4]
     ESA_shift_tran_matrix = np.load('../../../../emo_shift_intra_crf/ESA_shift_trans_fold' + FOLD_NUM + '.npy')[:4,:4]
-    intra_crf_outputs = joblib.load('./intra_crf_preds_4.pkl')
+    '''
+    #intra_crf_outputs = joblib.load('../../../../intra_crf/model/original_output/original/preds_4.pkl')
+    intra_crf_outputs = joblib.load('./preds_4.pkl')
 
     #dag_output = joblib.load('../../../../data/speech_only/DAG_outputs_4_all_audio.pkl')
-    rescoring_outputs = joblib.load('./preds_4.pkl')
-    
-    dialog_edit = joblib.load('../../../../data/speech_only/dialogs_edit_speech_only.pkl')
+    dialog_edit = joblib.load('../../../../data/dialogs_4emo.pkl')
     spk_dialog_edit = split_dialog(dialog_edit)
-    emo_dict = joblib.load('../../../../data/speech_only/emo_all_speech_only.pkl')
+    emo_dict = joblib.load('../../../../data/emo_all.pkl')
     emo_num_dict = {'Anger':0, 'Happiness':1, 'Neutral':2, 'Sadness':3}
+    #rescoring_outputs = joblib.load('./preds_4.pkl')
+    rescoring_outputs = {}
+    for utt in emo_dict:
+        if emo_dict[utt] in ['Anger', 'Happiness', 'Neutral', 'Sadness']:
+            rescoring_outputs[utt] = emo_num_dict[emo_dict[utt]]
     '''
     iaan_out_dict = {}
     for utt in iaan_output_fold1:
@@ -111,7 +118,7 @@ if __name__ == '__main__':
     case_dict_label = {}
     for dia_name in spk_dialog_edit:
         for i, utt in enumerate(spk_dialog_edit[dia_name]):
-            if i != 0 and utt[4] == FOLD_NUM:
+            if i != 0 and (utt[4] == FOLD_NUM or FOLD_NUM == None):
                 #if i != 0:
                 cur_emo = emo_dict[utt][0].lower()
                 pre_emo = emo_dict[spk_dialog_edit[dia_name][i-1]][0].lower()
@@ -192,13 +199,39 @@ if __name__ == '__main__':
         if i == 0:
             plt.figure()
             sns.set(font_scale=1.5)
-            sns.heatmap(np.array(result_list), annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], cbar=True, square=True, cmap="OrRd", annot_kws={"size": 14})
+            sns.heatmap(np.array(result_list)*(-1), annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], cbar=True, square=True, cmap="OrRd", annot_kws={"size": 14})
             plt.savefig('case16_heatmap.png')
         elif i == 1:
             esa_crf_recall_arr = np.array(result_list)
         elif i == 2:
             intra_crf_recall_arr = np.array(result_list)
+                
+    case16_data_points_list = [[],[],[],[]]
+    case16_data_points_list[0].append(len(case_dict_label['a2a_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[0].append(len(case_dict_label['h2a_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[0].append(len(case_dict_label['n2a_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[0].append(len(case_dict_label['s2a_utt_list'])/(case_total_utt_cnt/2))
     
+    case16_data_points_list[1].append(len(case_dict_label['a2h_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[1].append(len(case_dict_label['h2h_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[1].append(len(case_dict_label['n2h_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[1].append(len(case_dict_label['s2h_utt_list'])/(case_total_utt_cnt/2))
+    
+    case16_data_points_list[2].append(len(case_dict_label['a2n_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[2].append(len(case_dict_label['h2n_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[2].append(len(case_dict_label['n2n_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[2].append(len(case_dict_label['s2n_utt_list'])/(case_total_utt_cnt/2))
+    
+    case16_data_points_list[3].append(len(case_dict_label['a2s_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[3].append(len(case_dict_label['h2s_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[3].append(len(case_dict_label['n2s_utt_list'])/(case_total_utt_cnt/2))
+    case16_data_points_list[3].append(len(case_dict_label['s2s_utt_list'])/(case_total_utt_cnt/2))
+    
+    plt.figure()
+    sns.set(font_scale=1.5)
+    sns.heatmap(np.array(case16_data_points_list)*100, annot=True, fmt='.2f', xticklabels=['ang', 'hap', 'neu', 'sad'], yticklabels=['ang', 'hap', 'neu', 'sad'], cbar=True, square=True, cmap="YlGnBu", annot_kws={"size": 14})
+    plt.savefig('case16_data_points_heatmap.png')
+    '''
     intra_crf_tran_mtx_case1, intra_crf_tran_mtx_case2, esa_crf_tran_mtx_case1, esa_crf_tran_mtx_case2 = [],[],[],[]
     intra_crf_recall_case1, intra_crf_recall_case2, esa_crf_recall_case1, esa_crf_recall_case2 = [],[],[],[]
     for i in range(0,4,1):
@@ -213,7 +246,7 @@ if __name__ == '__main__':
                 esa_crf_tran_mtx_case2.append(ESA_shift_tran_matrix[i][j])
                 intra_crf_recall_case2.append(intra_crf_recall_arr[i][j])
                 esa_crf_recall_case2.append(esa_crf_recall_arr[i][j])
-    
+                
     print('pearsonr ##########')
     corr, _ = pearsonr(np.array(intra_crf_tran_mtx_case1), np.array(intra_crf_recall_case1))
     print('CRF (intra) (case1): corr between tran mtx & recall', round(corr,4))
@@ -239,4 +272,4 @@ if __name__ == '__main__':
     
     corr, _ = spearmanr(np.array(esa_crf_tran_mtx_case2), np.array(esa_crf_recall_case2))
     print('ESA CRF (case2): corr between tran mtx & recall', round(corr,4))
-        
+    '''

@@ -176,7 +176,7 @@ if __name__ == "__main__":
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"
     #EMBEDDING_DIM = 5
-    '''
+    
     output_fold1 = joblib.load('../data/original_output/utt_logits_outputs_fold1.pkl')
     output_fold2 = joblib.load('../data/original_output/utt_logits_outputs_fold2.pkl')
     output_fold3 = joblib.load('../data/original_output/utt_logits_outputs_fold3.pkl')
@@ -195,13 +195,13 @@ if __name__ == "__main__":
             out_dict[utt] = output_fold4[utt]
         elif utt[4] == '5':
             out_dict[utt] = output_fold5[utt]
-    '''
-    out_dict = joblib.load('../data/speech_only/outputs_4_all_fold_text_audio.pkl')
-    dialogs = joblib.load('../data/speech_only/dialogs_speech_only.pkl')
-    dialogs_edit = joblib.load('../data/speech_only/dialogs_edit_speech_only.pkl')
+    
+    #out_dict = joblib.load('../data/original_output/DAG_outputs_4_all_fold_interspeech_text.pkl')
+    dialogs = joblib.load('../data/dialogs.pkl')
+    dialogs_edit = joblib.load('../data/dialogs_4emo.pkl')
     
     if args.dataset == 'original':
-        emo_dict = joblib.load('../data/speech_only/emo_all_speech_only.pkl')
+        emo_dict = joblib.load('../data/emo_all.pkl')
         dias = dialogs_edit
     elif args.dataset == 'U2U':
         emo_dict = joblib.load('../data/'+ args.pretrain_version + '/U2U_4emo_all.pkl')
@@ -342,7 +342,7 @@ if __name__ == "__main__":
             for j, emo in enumerate(test_data_Ses05[i][1]):
                 label.append(emo_to_ix[emo])
                 
-    ori_emo_dict = joblib.load('../data/speech_only/emo_all_speech_only.pkl')
+    ori_emo_dict = joblib.load('../data/emo_all.pkl')
     '''
     label = []
     for _, dia in enumerate(dialogs):
@@ -359,8 +359,8 @@ if __name__ == "__main__":
     # ensure pretrained model performance
     labels = []
     predicts = []
-    dialogs_edit = joblib.load('../data/speech_only/dialogs_edit_speech_only.pkl')
-    emo_dict = joblib.load('../data/speech_only/emo_all_speech_only.pkl')
+    dialogs_edit = joblib.load('../data/dialogs_4emo.pkl')
+    emo_dict = joblib.load('../data/emo_all.pkl')
     emo2num = {'Anger':0, 'Happiness':1, 'Neutral':2, 'Sadness':3}
     
     for dialog_name in dialogs_edit:

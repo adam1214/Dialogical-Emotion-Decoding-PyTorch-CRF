@@ -417,10 +417,10 @@ if __name__ == "__main__":
         val_loss_list.append(val_loss_sum/len(val_data))
 
         #Save the best model so far
-        if f1_val > max_f1_val:
+        if uar_val > max_uar_val:
             val_loss_sum = 0
             best_epoch = epoch
-            max_f1_val = f1_val
+            max_uar_val = uar_val
             checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'loss': loss}
             torch.save(checkpoint, './model/' + args.pretrain_version + '/' + args.dataset + '/Ses0' + str(args.model_num) + '.pth')
             
